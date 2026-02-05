@@ -137,6 +137,13 @@ async def honeypot_endpoint(
     try:
         logger.info(f"Processing message for session: {request.sessionId}")
 
+        # Log incoming message
+        logger.info(
+            f"📨 INCOMING [{request.sessionId}] "
+            f"Sender: {request.message.sender} | "
+            f"Message: {request.message.text}"
+        )
+
         # Get or create session
         session = session_manager.get_or_create_session(request.sessionId)
 
@@ -163,6 +170,11 @@ async def honeypot_endpoint(
             conversation_history=[msg.model_dump() for msg in session.conversation_history]
         )
 
+        # Log extracted intelligence
+        intel_summary = f"Banks:{len(extracted_intel.bankAccounts)} UPI:{len(extracted_intel.upiIds)} Links:{len(extracted_intel.phishingLinks)} Phones:{len(extracted_intel.phoneNumbers)}"
+        if any([extracted_intel.bankAccounts, extracted_intel.upiIds, extracted_intel.phishingLinks, extracted_intel.phoneNumbers]):
+            logger.info(f"🔍 EXTRACTED [{request.sessionId}] {intel_summary}")
+
         # Update session with detection results and extracted intelligence
         session = session_manager.update_session(
             session_id=request.sessionId,
@@ -185,8 +197,8 @@ async def honeypot_endpoint(
             print(f"[DEBUG] After persona generation: response_text='{response_text}', persona='{persona_name}'")
         logger.info(f"Session {request.sessionId}: Using persona '{persona_name}'")
 
-        # Validate and fix response with guardrails
-        is_valid, fixed_response, warnings = response_validator.validate_response(
+        # Validate and fix response with LLM-based guardrails
+        is_valid, fixed_response, warnings = await response_validator.validate_response(
             response=response_text,
             persona_name=persona_name,
             scam_confidence=confidence
@@ -195,15 +207,18 @@ async def honeypot_endpoint(
         if warnings:
             logger.warning(f"Session {request.sessionId}: Response warnings: {warnings}")
 
-        if not is_valid:
-            logger.error(f"Session {request.sessionId}: Invalid response, using fallback")
-            fixed_response = response_validator.generate_safe_fallback(persona_name)
-
         if DEBUG:
             print(f"[DEBUG] After validation: is_valid={is_valid}, fixed_response='{fixed_response}', warnings={warnings}")
 
         # Use fixed response
         response_text = fixed_response
+
+        # Log outgoing response
+        logger.info(
+            f"📤 OUTGOING [{request.sessionId}] "
+            f"Persona: {persona_name} | "
+            f"Response: {response_text}"
+        )
 
         # Add agent response to conversation history
         agent_message = Message(
@@ -225,7 +240,14 @@ async def honeypot_endpoint(
         )
 
         if should_callback:
-            logger.info(f"Triggering GUVI callback for session {request.sessionId}")
+            intel = session.extracted_intelligence
+            logger.info(
+                f"🎯 CALLBACK [{request.sessionId}] "
+                f"Messages:{session.message_count} | "
+                f"Intelligence: Banks:{len(intel.bankAccounts)} "
+                f"UPI:{len(intel.upiIds)} Links:{len(intel.phishingLinks)} "
+                f"Phones:{len(intel.phoneNumbers)}"
+            )
 
             callback_result = await guvi_callback.send_final_result(session)
 
