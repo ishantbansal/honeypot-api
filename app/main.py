@@ -15,7 +15,7 @@ from app.extraction.intelligence_extractor import IntelligenceExtractor
 from app.agents.persona_orchestrator import PersonaOrchestrator
 from app.utils.session_manager import session_manager
 from app.utils.guvi_callback import create_guvi_callback_handler
-from app.utils.response_validator import response_validator
+from app.utils.response_validator import create_response_validator
 
 # Configure logging
 logging.basicConfig(
@@ -32,13 +32,14 @@ llm_client: BaseLLMClient = None
 scam_detector: ScamDetector = None
 intel_extractor: IntelligenceExtractor = None
 persona_orchestrator: PersonaOrchestrator = None
+response_validator = None
 guvi_callback = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize services on startup and cleanup on shutdown."""
-    global llm_client, scam_detector, intel_extractor, persona_orchestrator, guvi_callback
+    global llm_client, scam_detector, intel_extractor, persona_orchestrator, response_validator, guvi_callback
 
     logger.info("Initializing Honeypot API...")
 
@@ -65,6 +66,7 @@ async def lifespan(app: FastAPI):
     scam_detector = ScamDetector(llm_client)
     intel_extractor = IntelligenceExtractor(llm_client)
     persona_orchestrator = PersonaOrchestrator(llm_client)
+    response_validator = create_response_validator(llm_client)
     guvi_callback = create_guvi_callback_handler(settings.guvi_callback_url)
 
     logger.info("All components initialized successfully")
@@ -170,12 +172,13 @@ async def honeypot_endpoint(
             agent_note=f"Scam type: {scam_details.get('scam_type', 'unknown')}"
         )
 
-        # Generate response using appropriate persona
+        # Generate response using appropriate persona (with extraction targeting)
         response_text, persona_name = await persona_orchestrator.generate_response(
             latest_message=request.message.text,
             conversation_history=[msg.model_dump() for msg in session.conversation_history],
             scam_confidence=confidence,
-            scam_details=scam_details
+            scam_details=scam_details,
+            extracted_intelligence=session.extracted_intelligence.model_dump()
         )
 
         if DEBUG:

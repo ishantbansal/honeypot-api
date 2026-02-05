@@ -137,15 +137,17 @@ class SessionManager:
         """
         Determine if GUVI callback should be triggered.
 
+        STRATEGY: Callback when ALL 5 intelligence fields are filled.
+        Maximize extraction by continuing conversation until complete or timeout.
+
         Triggers if:
-        1. Critical intelligence extracted AND minimum messages met
-        2. Maximum messages reached
-        3. High confidence scam detected with some intelligence
+        1. ALL 5 fields filled (perfect extraction)
+        2. Safety timeout reached (must submit something)
 
         Args:
             session_id: Session identifier
-            min_messages: Minimum messages before callback
-            max_messages: Maximum messages before forcing callback
+            min_messages: Ignored (kept for API compatibility)
+            max_messages: Maximum messages before forcing callback (default 20)
 
         Returns:
             True if callback should be triggered
@@ -154,39 +156,32 @@ class SessionManager:
         if not session:
             return False
 
-        # Don't trigger if not confirmed scam
-        if not session.scam_detected or session.scam_confidence < 0.7:
+        # Must be confirmed scam
+        if not session.scam_detected:
             return False
 
         intel = session.extracted_intelligence
+        messages = session.message_count
 
-        # Check if we have critical intelligence
-        has_critical_intel = (
-            len(intel.bankAccounts) > 0 or
-            len(intel.upiIds) > 0 or
-            len(intel.phishingLinks) > 0 or
-            len(intel.phoneNumbers) > 0
+        # Check if ALL 5 fields are filled
+        all_fields_filled = (
+            len(intel.bankAccounts) > 0 and
+            len(intel.upiIds) > 0 and
+            len(intel.phishingLinks) > 0 and
+            len(intel.phoneNumbers) > 0 and
+            len(intel.suspiciousKeywords) > 0
         )
 
-        # Check if we have substantial intelligence (multiple pieces)
-        intel_count = (
-            len(intel.bankAccounts) +
-            len(intel.upiIds) +
-            len(intel.phishingLinks) +
-            len(intel.phoneNumbers)
-        )
-        has_substantial_intel = intel_count >= 2
-
-        # Trigger conditions
-        if has_substantial_intel and session.message_count >= min_messages:
+        # 🏆 CONDITION 1: Perfect extraction - all fields filled
+        if all_fields_filled:
             return True
 
-        if has_critical_intel and session.message_count >= min_messages * 1.5:
+        # ⏱️ CONDITION 2: Safety timeout
+        # Must callback eventually even if not all fields filled
+        if messages >= max_messages:
             return True
 
-        if session.message_count >= max_messages:
-            return True
-
+        # Otherwise, keep extracting
         return False
 
     def get_session_summary(self, session_id: str) -> Optional[str]:

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     scam_confidence_threshold: float = 0.7
     min_messages_before_callback: int = 5
 
+    # Debug Configuration
+    debug: bool = False
+
     class Config:
         env_file = ".env"
         case_sensitive = False

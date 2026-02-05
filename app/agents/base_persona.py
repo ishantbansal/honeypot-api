@@ -31,7 +31,8 @@ class BasePersonaAgent(ABC):
         self,
         latest_message: str,
         conversation_history: List[Dict[str, str]],
-        scam_details: Dict = None
+        scam_details: Dict = None,
+        extraction_context: str = None
     ) -> str:
         """
         Generate a response as this persona.
@@ -40,6 +41,7 @@ class BasePersonaAgent(ABC):
             latest_message: The latest message from the scammer
             conversation_history: Full conversation history
             scam_details: Optional scam detection details for context
+            extraction_context: What intelligence is still needed (for honeypot)
 
         Returns:
             Generated response text
@@ -62,6 +64,10 @@ class BasePersonaAgent(ABC):
         # Add latest message
         messages.append(LLMMessage("user", latest_message))
 
+        # Add extraction context if available (for honeypot targeting)
+        if extraction_context:
+            messages[-1].content += f"\n\n[EXTRACTION TARGET: {extraction_context}]"
+
         # Add scam context if available
         if scam_details:
             context_hint = self._build_context_hint(scam_details)
@@ -81,7 +87,8 @@ class BasePersonaAgent(ABC):
         self,
         latest_message: str,
         conversation_history: List[Dict[str, str]],
-        scam_details: Dict = None
+        scam_details: Dict = None,
+        extraction_context: str = None
     ) -> str:
         """Synchronous version of generate_response."""
         messages = [
@@ -98,6 +105,10 @@ class BasePersonaAgent(ABC):
                 messages.append(LLMMessage("assistant", text))
 
         messages.append(LLMMessage("user", latest_message))
+
+        # Add extraction context if available
+        if extraction_context:
+            messages[-1].content += f"\n\n[EXTRACTION TARGET: {extraction_context}]"
 
         if scam_details:
             context_hint = self._build_context_hint(scam_details)

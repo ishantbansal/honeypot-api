@@ -10,29 +10,26 @@ from app.models.schemas import ExtractedIntelligence
 class IntelligenceExtractor:
     """Extracts intelligence from scammer messages using LLM + regex."""
 
-    EXTRACTION_PROMPT = """You are a cybersecurity analyst extracting intelligence from a scammer conversation.
+    EXTRACTION_PROMPT = """Extract ALL scammer intelligence from this conversation.
 
-Analyze the conversation and extract ALL instances of:
-1. Bank account numbers (Indian format: 9-18 digits)
-2. UPI IDs (format: username@bankname)
-3. Phishing links/URLs
-4. Phone numbers (Indian format: +91 or 10 digits starting with 6-9)
-5. Suspicious keywords and tactics used
+Extract (be aggressive, include all variations):
+1. Bank account numbers (any format: digits, spaces, dashes)
+2. UPI IDs (username@bank)
+3. Phishing links/URLs (with or without http://)
+4. Phone numbers (any format, normalize to +91XXXXXXXXXX)
+5. Suspicious keywords (urgency, threats, authority words)
 
 Conversation:
 {conversation}
 
-Respond in JSON format:
+Respond in JSON:
 {{
-  "bank_accounts": ["account1", "account2"],
-  "upi_ids": ["user@paytm", "user@googlepay"],
-  "phishing_links": ["http://fake-site.com"],
-  "phone_numbers": ["+919876543210"],
-  "suspicious_keywords": ["urgent", "verify", "blocked"],
-  "scammer_tactics": ["urgency", "authority_impersonation", "threat"]
-}}
-
-Extraction:"""
+  "bank_accounts": [],
+  "upi_ids": [],
+  "phishing_links": [],
+  "phone_numbers": [],
+  "suspicious_keywords": []
+}}"""
 
     def __init__(self, llm_client: BaseLLMClient):
         """
@@ -43,20 +40,29 @@ Extraction:"""
         """
         self.llm_client = llm_client
 
-        # Regex patterns as fallback
+        # Regex patterns as fallback (more aggressive to catch all variations)
         self.upi_pattern = re.compile(r'\b[\w.-]+@[\w.-]+\b')
-        self.phone_pattern = re.compile(r'(\+91|91)?[\s-]?[6-9]\d{9}\b')
+
+        # Phone: handles +91, 91, spaces, dashes in various positions
+        self.phone_pattern = re.compile(r'(?:\+91|91)?[\s-]?[6-9][\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d')
+
+        # URL: matches both with and without http://
         self.url_pattern = re.compile(
-            r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+            r'(?:http[s]?://)?(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}'
         )
-        self.account_pattern = re.compile(r'\b\d{9,18}\b')
+
+        # Bank account: flexible pattern to catch numbers with spaces/dashes
+        self.account_pattern = re.compile(r'\b\d[\d\s-]{8,20}\d\b')
 
     async def extract_intelligence(
         self,
         conversation_history: List[Dict[str, str]]
     ) -> ExtractedIntelligence:
         """
-        Extract intelligence from conversation using LLM + regex.
+        Extract intelligence from conversation using LLM-primary approach.
+
+        Uses LLM as primary extractor, regex as validation/supplement.
+        LLM is smart enough to handle all variations and edge cases.
 
         Args:
             conversation_history: Full conversation history
@@ -67,17 +73,17 @@ Extraction:"""
         # Format conversation for analysis
         formatted_conversation = self._format_conversation(conversation_history)
 
-        # Try LLM-based extraction first
+        # PRIMARY: LLM-based extraction (intelligent, handles all variations)
         try:
             llm_intel = await self._llm_extraction(formatted_conversation)
         except Exception as e:
             print(f"LLM extraction error: {e}")
             llm_intel = ExtractedIntelligence()
 
-        # Also do regex extraction as backup/supplement
+        # SUPPLEMENTARY: Regex extraction (catches anything LLM might miss)
         regex_intel = self._regex_extraction(formatted_conversation)
 
-        # Merge both results (union of findings)
+        # Merge: LLM results + any additional regex findings
         merged_intel = self._merge_intelligence(llm_intel, regex_intel)
 
         return merged_intel
@@ -134,12 +140,21 @@ Extraction:"""
         for match in matches:
             if isinstance(match, tuple):
                 match = ''.join(match)
-            # Clean up
+            # Clean up - remove all non-digits
             digits = re.sub(r'[^\d]', '', match)
-            if len(digits) == 10:
+            # Normalize to +91XXXXXXXXXX format
+            if len(digits) == 10 and digits[0] in '6789':
+                # 10 digits starting with 6-9
                 normalized.append(f"+91{digits}")
+            elif len(digits) == 11 and digits.startswith('0'):
+                # 11 digits with leading 0 (remove 0)
+                normalized.append(f"+91{digits[1:]}")
             elif len(digits) == 12 and digits.startswith('91'):
+                # 12 digits starting with 91
                 normalized.append(f"+{digits}")
+            elif len(digits) == 13 and digits.startswith('091'):
+                # 13 digits with 091
+                normalized.append(f"+91{digits[3:]}")
         return list(set(normalized))
 
     def _extract_urls(self, text: str) -> List[str]:
@@ -150,9 +165,14 @@ Extraction:"""
     def _extract_accounts(self, text: str) -> List[str]:
         """Extract potential bank account numbers."""
         matches = self.account_pattern.findall(text)
-        # Filter out numbers that are too common (like dates, prices)
-        # Bank accounts are typically 11-18 digits
-        return [m for m in matches if 11 <= len(m) <= 18]
+        cleaned = []
+        for match in matches:
+            # Remove spaces and dashes
+            digits_only = re.sub(r'[^\d]', '', match)
+            # Bank accounts are typically 9-18 digits (relaxed from 11-18)
+            if 9 <= len(digits_only) <= 18:
+                cleaned.append(digits_only)
+        return list(set(cleaned))
 
     def _format_conversation(self, history: List[Dict[str, str]]) -> str:
         """Format conversation for LLM analysis."""

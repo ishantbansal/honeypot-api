@@ -1,58 +1,51 @@
-"""Response validator and guardrails for LLM-generated responses."""
+"""LLM-based response validator - checks and auto-fixes violations."""
 
-import re
+import json
 from typing import Tuple, List
+from app.utils.llm_client import BaseLLMClient, LLMMessage
 
 
 class ResponseValidator:
-    """Validates and fixes LLM responses to ensure quality and safety."""
+    """LLM-based validator for AI reveals and ethics violations."""
 
-    # Phrases that reveal AI nature
-    AI_REVEALS = [
-        "as an ai",
-        "language model",
-        "i'm an artificial",
-        "i'm a bot",
-        "i cannot actually",
-        "i don't have the ability",
-        "as an assistant",
-        "i'm programmed",
-        "my programming",
-    ]
+    VALIDATION_PROMPT = """You are validating a response from a honeypot agent engaging with a scammer.
 
-    # Phrases that are too technical/smart
-    TOO_TECHNICAL = [
-        "cybersecurity",
-        "phishing",
-        "authentication",
-        "verification protocol",
-        "security guidelines",
-        "fraud detection",
-        "malicious",
-    ]
+CHECK FOR VIOLATIONS:
+1. AI Reveals - Does response reveal it's AI/bot? (e.g., "as an AI", "I'm a bot")
+2. Impersonation - Does it claim to be a real specific person? (e.g., "I am John Smith")
+3. Illegal Instructions - Does it instruct illegal activity?
+4. Harassment - Is it harassing or abusive?
 
-    # Phrases that break character (too formal/robotic)
-    TOO_FORMAL = [
-        "i appreciate your",
-        "i understand your concern",
-        "i recommend that you",
-        "please be advised",
-        "for your information",
-        "i would suggest",
-    ]
+RESPONSE TO VALIDATE:
+"{response}"
 
-    def __init__(self):
-        """Initialize validator."""
-        pass
+If violations found, rewrite the response to remove them while keeping the intent.
+If no violations, return original response unchanged.
 
-    def validate_response(
+Respond in JSON:
+{{
+  "has_violations": true/false,
+  "violations": ["list of violations found"],
+  "fixed_response": "corrected response (or original if no violations)"
+}}"""
+
+    def __init__(self, llm_client: BaseLLMClient):
+        """
+        Initialize LLM-based validator.
+
+        Args:
+            llm_client: LLM client for validation
+        """
+        self.llm_client = llm_client
+
+    async def validate_response(
         self,
         response: str,
         persona_name: str,
         scam_confidence: float
     ) -> Tuple[bool, str, List[str]]:
         """
-        Validate and potentially fix an LLM-generated response.
+        Use LLM to validate and auto-fix response.
 
         Args:
             response: Generated response text
@@ -62,170 +55,80 @@ class ResponseValidator:
         Returns:
             Tuple of (is_valid, fixed_response, warnings)
         """
-        warnings = []
-        fixed_response = response
+        try:
+            # Use LLM to validate and fix
+            prompt = self.VALIDATION_PROMPT.format(response=response)
 
-        # Check 1: AI reveals
-        if self._contains_ai_reveal(response):
-            warnings.append("Response reveals AI nature")
-            fixed_response = self._remove_ai_reveals(fixed_response)
+            messages = [
+                LLMMessage("system", "You are a response validator. Always respond with valid JSON."),
+                LLMMessage("user", prompt)
+            ]
 
-        # Check 2: Too technical for persona
-        if self._is_too_technical(response, persona_name):
-            warnings.append("Response too technical for persona")
-            fixed_response = self._simplify_response(fixed_response)
+            llm_response = await self.llm_client.generate(
+                messages=messages,
+                temperature=0.2,  # Low temperature for consistent validation
+                max_tokens=500,
+                json_mode=True
+            )
 
-        # Check 3: Too formal/robotic
-        if self._is_too_formal(response):
-            warnings.append("Response too formal")
-            fixed_response = self._make_informal(fixed_response)
+            # Parse validation result
+            result = json.loads(llm_response)
 
-        # Check 4: Too long (should be 1-3 sentences)
-        if self._is_too_long(response):
-            warnings.append("Response too long")
-            fixed_response = self._shorten_response(fixed_response)
+            has_violations = result.get("has_violations", False)
+            violations = result.get("violations", [])
+            fixed_response = result.get("fixed_response", response)
 
-        # Check 5: For honeypot, ensure asking for scammer info
-        if persona_name == "Honeypot" and scam_confidence > 0.8:
-            if not self._is_extracting_intelligence(response):
-                warnings.append("Honeypot not asking for scammer information")
+            # Return fixed response (or original if no violations)
+            return True, fixed_response, violations
 
-        # Check 6: Not too compliant (don't give info without extracting)
-        if self._is_too_compliant(response, persona_name):
-            warnings.append("Too compliant - might give info without extracting")
+        except Exception as e:
+            # If validation fails, pass through original response
+            print(f"Validation error: {e}")
+            return True, response, ["Validation failed - passed through"]
 
-        # Determine if valid (no critical issues)
-        is_valid = not any(
-            warning.startswith("Response reveals AI") for warning in warnings
-        )
+    def validate_response_sync(
+        self,
+        response: str,
+        persona_name: str,
+        scam_confidence: float
+    ) -> Tuple[bool, str, List[str]]:
+        """Synchronous version of validate_response."""
+        try:
+            prompt = self.VALIDATION_PROMPT.format(response=response)
 
-        return is_valid, fixed_response, warnings
+            messages = [
+                LLMMessage("system", "You are a response validator. Always respond with valid JSON."),
+                LLMMessage("user", prompt)
+            ]
 
-    def _contains_ai_reveal(self, text: str) -> bool:
-        """Check if text reveals AI nature."""
-        text_lower = text.lower()
-        return any(phrase in text_lower for phrase in self.AI_REVEALS)
+            llm_response = self.llm_client.generate_sync(
+                messages=messages,
+                temperature=0.2,
+                max_tokens=500,
+                json_mode=True
+            )
 
-    def _remove_ai_reveals(self, text: str) -> str:
-        """Remove AI reveal phrases and replace with natural language."""
-        # If response contains AI reveal, return a safe fallback
-        return "I'm not sure I understand. Can you explain more?"
+            result = json.loads(llm_response)
 
-    def _is_too_technical(self, text: str, persona_name: str) -> bool:
-        """Check if response is too technical for the persona."""
-        if persona_name in ["Normal User", "Skeptical User"]:
-            text_lower = text.lower()
-            return any(phrase in text_lower for phrase in self.TOO_TECHNICAL)
-        return False
+            has_violations = result.get("has_violations", False)
+            violations = result.get("violations", [])
+            fixed_response = result.get("fixed_response", response)
 
-    def _simplify_response(self, text: str) -> str:
-        """Simplify technical language."""
-        # Replace technical terms with simpler ones
-        replacements = {
-            "cybersecurity": "safety",
-            "phishing": "fake",
-            "authentication": "checking",
-            "verification": "checking",
-            "protocol": "process",
-        }
+            return True, fixed_response, violations
 
-        result = text
-        for tech, simple in replacements.items():
-            result = re.sub(tech, simple, result, flags=re.IGNORECASE)
-
-        return result
-
-    def _is_too_formal(self, text: str) -> bool:
-        """Check if response is too formal/robotic."""
-        text_lower = text.lower()
-        return any(phrase in text_lower for phrase in self.TOO_FORMAL)
-
-    def _make_informal(self, text: str) -> str:
-        """Make response more informal/natural."""
-        replacements = {
-            "I appreciate your": "Thanks for",
-            "I understand your concern": "I get it",
-            "I recommend that you": "You should",
-            "please be advised": "just so you know",
-            "for your information": "by the way",
-            "I would suggest": "Maybe",
-        }
-
-        result = text
-        for formal, informal in replacements.items():
-            result = re.sub(formal, informal, result, flags=re.IGNORECASE)
-
-        return result
-
-    def _is_too_long(self, text: str) -> bool:
-        """Check if response is too long."""
-        # Count sentences (rough approximation)
-        sentence_count = text.count('.') + text.count('?') + text.count('!')
-        return sentence_count > 3 or len(text) > 300
-
-    def _shorten_response(self, text: str) -> str:
-        """Shorten response to 1-2 sentences."""
-        # Split into sentences
-        sentences = re.split(r'[.!?]+', text)
-        sentences = [s.strip() for s in sentences if s.strip()]
-
-        # Keep first 2 sentences
-        if len(sentences) > 2:
-            return '. '.join(sentences[:2]) + '.'
-
-        return text
-
-    def _is_extracting_intelligence(self, text: str) -> bool:
-        """Check if honeypot response is asking for scammer information."""
-        text_lower = text.lower()
-
-        extraction_indicators = [
-            "employee id",
-            "phone number",
-            "branch",
-            "upi id",
-            "account",
-            "which bank",
-            "where should i send",
-            "what's your",
-            "can you tell me your",
-            "give me your number",
-            "send me the link",
-        ]
-
-        return any(indicator in text_lower for indicator in extraction_indicators)
-
-    def _is_too_compliant(self, text: str, persona_name: str) -> bool:
-        """Check if response is too compliant (giving info without extracting)."""
-        text_lower = text.lower()
-
-        # Check if providing sensitive info
-        giving_info = any([
-            "my otp is" in text_lower,
-            "my account number is" in text_lower,
-            "here is my" in text_lower,
-            "my password is" in text_lower,
-        ])
-
-        # Check if asking for scammer info
-        asking_back = self._is_extracting_intelligence(text)
-
-        # Too compliant if giving info but NOT asking back
-        if persona_name == "Honeypot":
-            return giving_info and not asking_back
-
-        return giving_info
-
-    def generate_safe_fallback(self, persona_name: str) -> str:
-        """Generate a safe fallback response if LLM fails."""
-        fallbacks = {
-            "Normal User": "I'm confused. Can you explain what's happening?",
-            "Skeptical User": "I'm not sure about this. Can I call my bank first?",
-            "Honeypot": "I want to help but I'm scared. What's your employee ID so I know this is real?"
-        }
-
-        return fallbacks.get(persona_name, "Sorry, I didn't understand. Can you repeat?")
+        except Exception as e:
+            print(f"Validation error: {e}")
+            return True, response, ["Validation failed - passed through"]
 
 
-# Global validator instance
-response_validator = ResponseValidator()
+def create_response_validator(llm_client: BaseLLMClient) -> ResponseValidator:
+    """
+    Factory function to create response validator.
+
+    Args:
+        llm_client: LLM client for validation
+
+    Returns:
+        Initialized ResponseValidator
+    """
+    return ResponseValidator(llm_client)
