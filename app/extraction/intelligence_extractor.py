@@ -14,10 +14,16 @@ class IntelligenceExtractor:
 
 Extract (be aggressive, include all variations):
 1. Bank account numbers (any format: digits, spaces, dashes)
+   - Typically 9-18 digits
+   - DO NOT confuse with phone numbers (phone numbers start with country code like 91 or digits 6-9)
 2. UPI IDs (username@bank)
 3. Phishing links/URLs (with or without http://)
 4. Phone numbers (any format, normalize to +91XXXXXXXXXX)
+   - Indian phone numbers: 10 digits starting with 6-9
+   - With country code: 91 followed by 10 digits
 5. Suspicious keywords (urgency, threats, authority words)
+
+IMPORTANT: A number like "918765432109" is a PHONE NUMBER (91 + 10 digits), NOT a bank account.
 
 Conversation:
 {conversation}

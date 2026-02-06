@@ -176,12 +176,20 @@ async def honeypot_endpoint(
             logger.info(f"🔍 EXTRACTED [{request.sessionId}] {intel_summary}")
 
         # Update session with detection results and extracted intelligence
+        # Only add scam type note if it's new or changed
+        scam_type = scam_details.get('scam_type', 'unknown')
+        scam_type_note = f"Scam type: {scam_type}"
+
+        # Check if this scam type was already noted
+        should_add_note = not any(note.startswith("Scam type:") and scam_type in note
+                                  for note in session.agent_notes)
+
         session = session_manager.update_session(
             session_id=request.sessionId,
             scam_detected=is_scam and confidence >= settings.scam_confidence_threshold,
             scam_confidence=confidence,
             extracted_intel=extracted_intel,
-            agent_note=f"Scam type: {scam_details.get('scam_type', 'unknown')}"
+            agent_note=scam_type_note if should_add_note else None
         )
 
         # Generate response using appropriate persona (with extraction targeting)
