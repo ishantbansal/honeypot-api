@@ -177,7 +177,13 @@ Respond in JSON:
             digits_only = re.sub(r'[^\d]', '', match)
             # Bank accounts are typically 9-18 digits (relaxed from 11-18)
             if 9 <= len(digits_only) <= 18:
-                cleaned.append(digits_only)
+                # Filter out phone numbers (Indian mobile patterns)
+                is_phone = (
+                    (len(digits_only) == 10 and digits_only[0] in '6789') or  # 10 digits starting with 6-9
+                    (len(digits_only) == 12 and digits_only.startswith('91') and digits_only[2] in '6789')  # 91 + 10 digits
+                )
+                if not is_phone:
+                    cleaned.append(digits_only)
         return list(set(cleaned))
 
     def _format_conversation(self, history: List[Dict[str, str]]) -> str:

@@ -180,9 +180,8 @@ async def honeypot_endpoint(
         scam_type = scam_details.get('scam_type', 'unknown')
         scam_type_note = f"Scam type: {scam_type}"
 
-        # Check if this scam type was already noted
-        should_add_note = not any(note.startswith("Scam type:") and scam_type in note
-                                  for note in session.agent_notes)
+        # Check if this exact scam type note was already added (exact match to avoid duplicates)
+        should_add_note = scam_type_note not in session.agent_notes
 
         session = session_manager.update_session(
             session_id=request.sessionId,
