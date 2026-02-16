@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Security, Header, Query, Request
 from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
 import time
@@ -92,6 +93,13 @@ app = FastAPI(
     description="AI-powered honeypot for scam detection and intelligence extraction",
     version="1.0.0",
     lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # API Key authentication
