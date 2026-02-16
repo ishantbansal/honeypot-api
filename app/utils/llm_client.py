@@ -4,17 +4,27 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 import json
 from enum import Enum
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_random_exponential,
+    retry_if_exception_type
+)
 
 try:
-    from openai import OpenAI, AzureOpenAI
+    from openai import OpenAI, AzureOpenAI, RateLimitError, APITimeoutError, APIConnectionError
 except ImportError:
     OpenAI = None
     AzureOpenAI = None
+    RateLimitError = Exception
+    APITimeoutError = Exception
+    APIConnectionError = Exception
 
 try:
-    from anthropic import Anthropic
+    from anthropic import Anthropic, RateLimitError as AnthropicRateLimitError
 except ImportError:
     Anthropic = None
+    AnthropicRateLimitError = Exception
 
 
 class LLMProvider(str, Enum):
@@ -56,6 +66,12 @@ class BaseLLMClient(ABC):
         pass
 
     @abstractmethod
+    @retry(
+        stop=stop_after_attempt(6),
+        wait=wait_random_exponential(min=1, max=60),
+        retry=retry_if_exception_type((RateLimitError, APITimeoutError, APIConnectionError)),
+        reraise=True
+    )
     def generate_sync(
         self,
         messages: List[LLMMessage],
@@ -63,12 +79,16 @@ class BaseLLMClient(ABC):
         max_tokens: int = 500,
         json_mode: bool = False
     ) -> str:
-        """Synchronous version of generate."""
+        """
+        Synchronous version of generate with retry logic.
+
+        Automatically retries on rate limits (429), timeouts, and connection errors.
+        """
         pass
 
 
 class OpenAIClient(BaseLLMClient):
-    """OpenAI API client."""
+    """OpenAI API client with automatic retry on rate limits."""
 
     def __init__(self, api_key: str, model: str = "gpt-4o"):
         if OpenAI is None:
@@ -76,6 +96,12 @@ class OpenAIClient(BaseLLMClient):
         self.client = OpenAI(api_key=api_key)
         self.model = model
 
+    @retry(
+        stop=stop_after_attempt(6),
+        wait=wait_random_exponential(min=1, max=60),
+        retry=retry_if_exception_type((RateLimitError, APITimeoutError, APIConnectionError)),
+        reraise=True
+    )
     async def generate(
         self,
         messages: List[LLMMessage],
@@ -83,7 +109,12 @@ class OpenAIClient(BaseLLMClient):
         max_tokens: int = 500,
         json_mode: bool = False
     ) -> str:
-        """Generate response using OpenAI API."""
+        """
+        Generate response using OpenAI API.
+
+        Automatically retries on rate limits (429), timeouts, and connection errors.
+        Uses exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s (up to 60s max).
+        """
         openai_messages = [msg.to_openai() for msg in messages]
 
         kwargs = {
@@ -167,7 +198,7 @@ class OpenAIClient(BaseLLMClient):
 
 
 class AzureOpenAIClient(BaseLLMClient):
-    """Azure OpenAI API client."""
+    """Azure OpenAI API client with automatic retry."""
 
     def __init__(
         self,
@@ -186,6 +217,12 @@ class AzureOpenAIClient(BaseLLMClient):
         )
         self.deployment_name = deployment_name
 
+    @retry(
+        stop=stop_after_attempt(6),
+        wait=wait_random_exponential(min=1, max=60),
+        retry=retry_if_exception_type((RateLimitError, APITimeoutError, APIConnectionError)),
+        reraise=True
+    )
     async def generate(
         self,
         messages: List[LLMMessage],
@@ -193,7 +230,7 @@ class AzureOpenAIClient(BaseLLMClient):
         max_tokens: int = 500,
         json_mode: bool = False
     ) -> str:
-        """Generate response using Azure OpenAI API."""
+        """Generate response using Azure OpenAI API with retry."""
         openai_messages = [msg.to_openai() for msg in messages]
 
         kwargs = {
@@ -268,7 +305,7 @@ class AzureOpenAIClient(BaseLLMClient):
 
 
 class AnthropicClient(BaseLLMClient):
-    """Anthropic Claude API client."""
+    """Anthropic Claude API client with automatic retry."""
 
     def __init__(self, api_key: str, model: str = "claude-sonnet-4.5-20241022"):
         if Anthropic is None:
@@ -276,6 +313,12 @@ class AnthropicClient(BaseLLMClient):
         self.client = Anthropic(api_key=api_key)
         self.model = model
 
+    @retry(
+        stop=stop_after_attempt(6),
+        wait=wait_random_exponential(min=1, max=60),
+        retry=retry_if_exception_type((AnthropicRateLimitError,)),
+        reraise=True
+    )
     async def generate(
         self,
         messages: List[LLMMessage],
@@ -283,7 +326,7 @@ class AnthropicClient(BaseLLMClient):
         max_tokens: int = 500,
         json_mode: bool = False
     ) -> str:
-        """Generate response using Anthropic API."""
+        """Generate response using Anthropic API with retry."""
         # Separate system message from conversation messages
         system_message = None
         conversation_messages = []

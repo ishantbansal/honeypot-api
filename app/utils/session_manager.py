@@ -1,6 +1,7 @@
 """Session state management for honeypot conversations."""
 
 from typing import Dict, Optional
+import threading
 from app.models.schemas import SessionState, Message, ExtractedIntelligence
 
 
@@ -10,6 +11,22 @@ class SessionManager:
     def __init__(self):
         """Initialize session manager with in-memory storage."""
         self._sessions: Dict[str, SessionState] = {}
+        self._locks: Dict[str, threading.Lock] = {}
+        self._global_lock = threading.Lock()  # Protects _locks dict
+
+    def _get_session_lock(self, session_id: str) -> threading.Lock:
+        """Get or create a lock for a specific session.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Thread lock for this session
+        """
+        with self._global_lock:
+            if session_id not in self._locks:
+                self._locks[session_id] = threading.Lock()
+            return self._locks[session_id]
 
     def get_session(self, session_id: str) -> Optional[SessionState]:
         """
@@ -66,6 +83,8 @@ class SessionManager:
         """
         Update session state with new information.
 
+        Thread-safe: Uses session-specific lock to prevent race conditions.
+
         Args:
             session_id: Session identifier
             message: New message to add to history (optional)
@@ -79,40 +98,45 @@ class SessionManager:
         Returns:
             Updated SessionState
         """
-        session = self.get_or_create_session(session_id)
+        # Acquire lock for this specific session
+        with self._get_session_lock(session_id):
+            session = self.get_or_create_session(session_id)
 
-        # Add message to history if provided
-        if message:
-            session.conversation_history.append(message)
-            session.message_count += 1
+            # Add message to history if provided
+            if message:
+                session.conversation_history.append(message)
+                session.message_count += 1
 
-        # Update scam detection
-        if scam_detected is not None:
-            session.scam_detected = scam_detected
+            # Update scam detection
+            if scam_detected is not None:
+                session.scam_detected = scam_detected
 
-        if scam_confidence is not None:
-            session.scam_confidence = scam_confidence
+            if scam_confidence is not None:
+                session.scam_confidence = scam_confidence
 
-        # Update extracted intelligence
-        if extracted_intel:
-            session.extracted_intelligence = self._merge_intelligence(
-                session.extracted_intelligence,
-                extracted_intel
-            )
+            # Update extracted intelligence
+            if extracted_intel:
+                session.extracted_intelligence = self._merge_intelligence(
+                    session.extracted_intelligence,
+                    extracted_intel
+                )
 
-        # Add agent notes
-        if agent_note:
-            session.agent_notes.append(agent_note)
+            # Add agent notes
+            if agent_note:
+                session.agent_notes.append(agent_note)
 
-        # Update engagement phase
-        if engagement_phase:
-            session.engagement_phase = engagement_phase
+            # Update engagement phase
+            if engagement_phase:
+                session.engagement_phase = engagement_phase
 
-        # Store persona context
-        if persona_used:
-            session.persona_context = persona_used
+            # Store persona context
+            if persona_used:
+                session.persona_context = persona_used
+                # Track personas used
+                if persona_used not in session.personas_used:
+                    session.personas_used.append(persona_used)
 
-        return session
+            return session
 
     def _merge_intelligence(
         self,
@@ -221,16 +245,23 @@ class SessionManager:
         """
         Delete session from storage.
 
+        Thread-safe: Uses session lock during deletion.
+
         Args:
             session_id: Session identifier
 
         Returns:
             True if deleted, False if not found
         """
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-            return True
-        return False
+        with self._get_session_lock(session_id):
+            if session_id in self._sessions:
+                del self._sessions[session_id]
+                # Clean up lock
+                with self._global_lock:
+                    if session_id in self._locks:
+                        del self._locks[session_id]
+                return True
+            return False
 
     def get_all_sessions(self) -> Dict[str, SessionState]:
         """Get all active sessions."""

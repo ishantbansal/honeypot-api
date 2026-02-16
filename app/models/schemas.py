@@ -68,4 +68,5 @@ class SessionState(BaseModel):
     extracted_intelligence: ExtractedIntelligence = Field(default_factory=ExtractedIntelligence)
     agent_notes: List[str] = Field(default_factory=list)
     persona_context: str = ""
+    personas_used: List[str] = Field(default_factory=list)
     engagement_phase: Literal["detection", "engagement", "extraction", "completed"] = "detection"

@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     scam_confidence_threshold: float = 0.7
     min_messages_before_callback: int = 5
 
+    # Human Behavior Simulation
+    enable_human_delay: bool = True  # Set to False for fast testing
+
+    # Dashboard Configuration
+    dashboard_password: str = "admin123"  # Change in .env for production
+
     # Debug Configuration
     debug: bool = False
 

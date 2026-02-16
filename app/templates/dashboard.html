@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Honeypot Analytics Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .stat-card { transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-5px); }
+        .table-container { max-height: 500px; overflow-y: auto; }
+        .chart-container { position: relative; height: 300px; }
+        canvas { max-height: 300px; }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand">🍯 Honeypot Analytics Dashboard</span>
+            <span class="text-white">Auto-refresh: <span id="countdown">30</span>s</span>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Total Sessions</h5>
+                        <h2 class="text-primary">{{ stats.total_sessions }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Scam Detected</h5>
+                        <h2 class="text-danger">{{ stats.scam_sessions }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Total Intelligence</h5>
+                        <h2 class="text-success">{{ stats.total_intelligence }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-muted">Active Sessions</h5>
+                        <h2 class="text-warning">{{ stats.active_sessions }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Intelligence Breakdown -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Intelligence Breakdown</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <h6 class="text-muted">Bank Accounts</h6>
+                                <h4>{{ stats.intelligence_by_type.bank_account }}</h4>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="text-muted">UPI IDs</h6>
+                                <h4>{{ stats.intelligence_by_type.upi_id }}</h4>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="text-muted">Phishing Links</h6>
+                                <h4>{{ stats.intelligence_by_type.phishing_link }}</h4>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="text-muted">Phone Numbers</h6>
+                                <h4>{{ stats.intelligence_by_type.phone_number }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Metrics -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">📊 Success Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <h6 class="text-muted">Extraction Rate</h6>
+                                <h3 class="text-success">{{ success_metrics.extraction_rate }}%</h3>
+                                <small class="text-muted">{{ success_metrics.sessions_with_intel }} sessions with intel</small>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="text-muted">Avg Intel/Session</h6>
+                                <h3 class="text-info">{{ success_metrics.avg_intel_per_session }}</h3>
+                                <small class="text-muted">Intelligence per scam</small>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="text-muted">Avg Messages/Session</h6>
+                                <h3 class="text-primary">{{ success_metrics.avg_messages_per_session }}</h3>
+                                <small class="text-muted">Conversation length</small>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="text-muted">Completion Rate</h6>
+                                <h3 class="text-warning">{{ success_metrics.completion_rate }}%</h3>
+                                <small class="text-muted">Sessions completed</small>
+                            </div>
+                        </div>
+                        <hr class="my-3">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <h6 class="text-center mb-3">Conversion Funnel</h6>
+                                <div class="d-flex justify-content-around align-items-center">
+                                    <div class="text-center">
+                                        <div class="badge bg-secondary" style="font-size: 1.2rem; padding: 10px 20px;">
+                                            {{ success_metrics.conversion_funnel.total_sessions }}
+                                        </div>
+                                        <div class="mt-2">Total Sessions</div>
+                                    </div>
+                                    <div class="text-center">→</div>
+                                    <div class="text-center">
+                                        <div class="badge bg-danger" style="font-size: 1.2rem; padding: 10px 20px;">
+                                            {{ success_metrics.conversion_funnel.scam_detected }}
+                                        </div>
+                                        <div class="mt-2">Scams Detected</div>
+                                        <small class="text-muted">({{ success_metrics.scam_detection_rate }}%)</small>
+                                    </div>
+                                    <div class="text-center">→</div>
+                                    <div class="text-center">
+                                        <div class="badge bg-success" style="font-size: 1.2rem; padding: 10px 20px;">
+                                            {{ success_metrics.conversion_funnel.intel_extracted }}
+                                        </div>
+                                        <div class="mt-2">Intel Extracted</div>
+                                        <small class="text-muted">({{ success_metrics.extraction_rate }}%)</small>
+                                    </div>
+                                    <div class="text-center">→</div>
+                                    <div class="text-center">
+                                        <div class="badge bg-info" style="font-size: 1.2rem; padding: 10px 20px;">
+                                            {{ success_metrics.conversion_funnel.completed }}
+                                        </div>
+                                        <div class="mt-2">Completed</div>
+                                        <small class="text-muted">({{ success_metrics.completion_rate }}%)</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Persona Performance -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">🎭 Persona Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Persona</th>
+                                    <th>Sessions</th>
+                                    <th>Intel Extracted</th>
+                                    <th>Success Rate</th>
+                                    <th>Effectiveness</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for persona, data in persona_perf.personas.items() %}
+                                <tr>
+                                    <td><strong>{{ persona }}</strong></td>
+                                    <td>{{ data.sessions }}</td>
+                                    <td><span class="badge bg-success">{{ data.intel_extracted }}</span></td>
+                                    <td>{{ data.success_rate }}%</td>
+                                    <td>{{ persona_perf.effectiveness_scores.get(persona, 0.0) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Persona Distribution</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="personaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scam Intelligence -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">🚨 Top Scammers (Multi-Session)</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Value</th>
+                                    <th>Sessions</th>
+                                    <th>Total Appearances</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if scam_intel.top_scammers %}
+                                    {% for scammer in scam_intel.top_scammers[:10] %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-{{ 'warning' if scammer.type == 'phone' else 'primary' }}">
+                                                {{ scammer.type }}
+                                            </span>
+                                        </td>
+                                        <td><code>{{ scammer.value }}</code></td>
+                                        <td><strong>{{ scammer.sessions }}</strong></td>
+                                        <td>{{ scammer.count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">No duplicate scammers detected yet</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">📈 Scam Type Distribution</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="scamTypeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Duplicate Entities Alert -->
+        {% if scam_intel.duplicate_entities.phones or scam_intel.duplicate_entities.upis or scam_intel.duplicate_entities.bank_accounts %}
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">⚠️ Duplicate Entities Detected (Scammer Networks)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6>Phone Numbers ({{ scam_intel.duplicate_entities.phones|length }})</h6>
+                                {% if scam_intel.duplicate_entities.phones %}
+                                    {% for dup in scam_intel.duplicate_entities.phones[:3] %}
+                                    <div class="alert alert-danger mb-2">
+                                        <strong>{{ dup.value }}</strong><br>
+                                        <small>Appears in {{ dup.session_count }} sessions ({{ dup.total_appearances }} times)</small>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-secondary">None detected</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <h6>UPI IDs ({{ scam_intel.duplicate_entities.upis|length }})</h6>
+                                {% if scam_intel.duplicate_entities.upis %}
+                                    {% for dup in scam_intel.duplicate_entities.upis[:3] %}
+                                    <div class="alert alert-danger mb-2">
+                                        <strong>{{ dup.value }}</strong><br>
+                                        <small>Appears in {{ dup.session_count }} sessions ({{ dup.total_appearances }} times)</small>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-secondary">None detected</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Bank Accounts ({{ scam_intel.duplicate_entities.bank_accounts|length }})</h6>
+                                {% if scam_intel.duplicate_entities.bank_accounts %}
+                                    {% for dup in scam_intel.duplicate_entities.bank_accounts[:3] %}
+                                    <div class="alert alert-danger mb-2">
+                                        <strong>{{ dup.value }}</strong><br>
+                                        <small>Appears in {{ dup.session_count }} sessions ({{ dup.total_appearances }} times)</small>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-secondary">None detected</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-toggle="tab" href="#sessions">Recent Sessions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#conversations">Recent Messages</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#intelligence">Extracted Intelligence</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#downloads">Downloads</a>
+            </li>
+        </ul>
+
+        <div class="tab-content bg-white p-3 shadow-sm">
+            <!-- Sessions Tab -->
+            <div id="sessions" class="tab-pane fade show active">
+                <div class="table-container">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Session ID</th>
+                                <th>Scam</th>
+                                <th>Confidence</th>
+                                <th>Type</th>
+                                <th>Messages</th>
+                                <th>Intel</th>
+                                <th>Status</th>
+                                <th>Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session in recent_sessions %}
+                            <tr style="cursor: pointer;" onclick="viewConversation('{{ session.session_id }}')"
+                                class="table-row-hover" title="Click to view full conversation">
+                                <td><code>{{ session.session_id[:16] }}...</code> 👁️</td>
+                                <td>
+                                    <span class="badge bg-{{ 'danger' if session.scam_detected == 'True' else 'secondary' }}">
+                                        {{ 'Yes' if session.scam_detected == 'True' else 'No' }}
+                                    </span>
+                                </td>
+                                <td>{{ "%.2f"|format(session.scam_confidence|float) }}</td>
+                                <td>{{ session.scam_type }}</td>
+                                <td>{{ session.message_count }}</td>
+                                <td><span class="badge bg-success">{{ session.intelligence_count }}</span></td>
+                                <td>
+                                    <span class="badge bg-{{ 'info' if session.completed_at else 'warning' }}">
+                                        {{ 'Completed' if session.completed_at else 'Active' }}
+                                    </span>
+                                </td>
+                                <td>{{ session.last_updated[:19] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Conversations Tab -->
+            <div id="conversations" class="tab-pane fade">
+                <div class="table-container">
+                    <table class="table table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Session</th>
+                                <th>Sender</th>
+                                <th>Message</th>
+                                <th>Persona</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for conv in recent_conversations %}
+                            <tr>
+                                <td><code>{{ conv.session_id[:12] }}...</code></td>
+                                <td>
+                                    <span class="badge bg-{{ 'danger' if conv.sender == 'scammer' else 'primary' }}">
+                                        {{ conv.sender }}
+                                    </span>
+                                </td>
+                                <td>{{ conv.text[:100] }}{{ '...' if conv.text|length > 100 else '' }}</td>
+                                <td>{{ conv.persona_used if conv.persona_used else '-' }}</td>
+                                <td>{{ conv.logged_at[:19] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Intelligence Tab -->
+            <div id="intelligence" class="tab-pane fade">
+                <div class="table-container">
+                    <table class="table table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Session</th>
+                                <th>Type</th>
+                                <th>Value</th>
+                                <th>Extracted At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for intel in recent_intelligence %}
+                            <tr>
+                                <td><code>{{ intel.session_id[:12] }}...</code></td>
+                                <td>
+                                    <span class="badge bg-info">
+                                        {{ intel.type.replace('_', ' ').title() }}
+                                    </span>
+                                </td>
+                                <td><strong>{{ intel.value }}</strong></td>
+                                <td>{{ intel.extracted_at[:19] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Downloads Tab -->
+            <div id="downloads" class="tab-pane fade">
+                <div class="list-group">
+                    <a href="/api/v1/analytics/download/sessions?password={{ password }}" class="list-group-item list-group-item-action">
+                        <h5>📊 Sessions CSV</h5>
+                        <p class="mb-0">Download all session data</p>
+                    </a>
+                    <a href="/api/v1/analytics/download/conversations?password={{ password }}" class="list-group-item list-group-item-action">
+                        <h5>💬 Conversations CSV</h5>
+                        <p class="mb-0">Download all conversation messages</p>
+                    </a>
+                    <a href="/api/v1/analytics/download/intelligence?password={{ password }}" class="list-group-item list-group-item-action">
+                        <h5>🔍 Intelligence CSV</h5>
+                        <p class="mb-0">Download all extracted intelligence</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        // Auto-refresh countdown
+        let countdown = 30;
+        setInterval(() => {
+            countdown--;
+            document.getElementById('countdown').textContent = countdown;
+            if (countdown <= 0) {
+                location.reload();
+            }
+        }, 1000);
+
+        // Persona Distribution Pie Chart
+        const personaCtx = document.getElementById('personaChart');
+        if (personaCtx) {
+            new Chart(personaCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: {{ persona_labels | tojson }},
+                    datasets: [{
+                        data: {{ persona_values | tojson }},
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 206, 86, 0.8)',
+                            'rgba(255, 99, 132, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(255, 99, 132, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Scam Type Distribution Chart
+        const scamTypeCtx = document.getElementById('scamTypeChart');
+        if (scamTypeCtx) {
+            new Chart(scamTypeCtx, {
+                type: 'bar',
+                data: {
+                    labels: {{ scam_type_labels | tojson }},
+                    datasets: [{
+                        label: 'Sessions',
+                        data: {{ scam_type_values | tojson }},
+                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        // View full conversation in modal
+        async function viewConversation(sessionId) {
+            const modal = new bootstrap.Modal(document.getElementById('conversationModal'));
+            const modalTitle = document.getElementById('conversationModalLabel');
+            const modalBody = document.getElementById('conversationModalBody');
+
+            // Show loading
+            modalTitle.textContent = 'Loading conversation...';
+            modalBody.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
+            modal.show();
+
+            try {
+                // Fetch conversation for this session
+                const response = await fetch(`/api/v1/analytics/conversations?password={{ password }}&session_id=${sessionId}&limit=100`);
+                const data = await response.json();
+
+                if (data.conversations && data.conversations.length > 0) {
+                    // Update modal title
+                    modalTitle.innerHTML = `💬 Session: <code>${sessionId.substring(0, 20)}...</code> <span class="badge bg-info">${data.count} messages</span>`;
+
+                    // Build chat-like interface
+                    let html = '<div class="conversation-view" style="max-height: 600px; overflow-y: auto; background-color: #f8f9fa; padding: 15px; border-radius: 5px;">';
+
+                    data.conversations.forEach(msg => {
+                        const isScammer = msg.sender === 'scammer';
+                        const alignClass = isScammer ? 'text-end' : 'text-start';
+                        const bgClass = isScammer ? 'bg-danger text-white' : 'bg-primary text-white';
+
+                        html += `
+                            <div class="mb-3 ${alignClass}">
+                                <div class="d-inline-block p-3 rounded ${bgClass}" style="max-width: 75%;">
+                                    <div><strong>${msg.sender.toUpperCase()}</strong></div>
+                                    <div class="mt-1">${msg.text}</div>
+                                    ${msg.persona_used && !isScammer ? `<div class="mt-2"><span class="badge bg-warning text-dark">${msg.persona_used}</span></div>` : ''}
+                                </div>
+                                <div class="mt-1"><small class="text-muted">${msg.logged_at ? msg.logged_at.substring(0, 19) : 'N/A'}</small></div>
+                            </div>
+                        `;
+                    });
+
+                    html += '</div>';
+                    modalBody.innerHTML = html;
+                } else {
+                    modalTitle.textContent = 'No Conversation Found';
+                    modalBody.innerHTML = '<div class="alert alert-warning">No messages found for this session.</div>';
+                }
+            } catch (error) {
+                modalTitle.textContent = 'Error';
+                modalBody.innerHTML = `<div class="alert alert-danger">Failed to load conversation: ${error.message}</div>`;
+            }
+        }
+    </script>
+
+    <!-- Conversation Modal -->
+    <div class="modal fade" id="conversationModal" tabindex="-1" aria-labelledby="conversationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="conversationModalLabel">Conversation</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="conversationModalBody">
+                    <!-- Conversation will be loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .table-row-hover:hover {
+            background-color: rgba(0, 123, 255, 0.1) !important;
+            transform: scale(1.01);
+            transition: all 0.2s;
+        }
+    </style>
+</body>
+</html>

@@ -13,14 +13,14 @@ class PersonaOrchestrator:
     Orchestrates between different persona agents based on scam detection confidence.
 
     Confidence Ranges:
-    - 0.0 - 0.60: Normal User (confused, concerned, not suspicious)
-    - 0.60 - 0.80: Skeptical User (questioning but not accusatory)
-    - 0.80 - 1.0: Honeypot Mode (active intelligence extraction)
+    - 0.0 - 0.50: Normal User (confused, concerned, not suspicious)
+    - 0.50 - 0.85: Skeptical User (questioning but not accusatory)
+    - 0.85 - 1.0: Honeypot Mode (active intelligence extraction)
     """
 
     # Confidence thresholds
-    SKEPTICAL_THRESHOLD = 0.60
-    HONEYPOT_THRESHOLD = 0.80
+    SKEPTICAL_THRESHOLD = 0.50
+    HONEYPOT_THRESHOLD = 0.85
 
     def __init__(self, llm_client: BaseLLMClient):
         """
