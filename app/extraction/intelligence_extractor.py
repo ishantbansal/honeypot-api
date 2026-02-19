@@ -16,12 +16,13 @@ Extract (be aggressive, include all variations):
 1. Bank account numbers (any format: digits, spaces, dashes)
    - Typically 9-18 digits
    - DO NOT confuse with phone numbers (phone numbers start with country code like 91 or digits 6-9)
-2. UPI IDs (username@bank)
+2. UPI IDs (username@bank format like xyz@paytm, abc@upi)
 3. Phishing links/URLs (with or without http://)
 4. Phone numbers (any format, normalize to +91XXXXXXXXXX)
    - Indian phone numbers: 10 digits starting with 6-9
    - With country code: 91 followed by 10 digits
-5. Suspicious keywords (urgency, threats, authority words)
+5. Email addresses (any email like support@fake.com, offers@scam.in)
+6. Suspicious keywords (urgency, threats, authority words)
 
 IMPORTANT: A number like "918765432109" is a PHONE NUMBER (91 + 10 digits), NOT a bank account.
 
@@ -34,6 +35,7 @@ Respond in JSON:
   "upi_ids": [],
   "phishing_links": [],
   "phone_numbers": [],
+  "email_addresses": [],
   "suspicious_keywords": []
 }}"""
 
@@ -47,7 +49,10 @@ Respond in JSON:
         self.llm_client = llm_client
 
         # Regex patterns as fallback (more aggressive to catch all variations)
-        self.upi_pattern = re.compile(r'\b[\w.-]+@[\w.-]+\b')
+        # UPI IDs: username@singleword (no dot in domain part, distinguishes from emails)
+        self.upi_pattern = re.compile(r'\b[\w.-]+@[A-Za-z0-9]+\b')
+        # Emails: user@domain.tld (has dot + TLD in domain part)
+        self.email_pattern = re.compile(r'\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b')
 
         # Phone: handles +91, 91, spaces, dashes in various positions
         self.phone_pattern = re.compile(r'(?:\+91|91)?[\s-]?[6-9][\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d')
@@ -118,6 +123,7 @@ Respond in JSON:
             upiIds=data.get("upi_ids", []),
             phishingLinks=data.get("phishing_links", []),
             phoneNumbers=data.get("phone_numbers", []),
+            emailAddresses=data.get("email_addresses", []),
             suspiciousKeywords=data.get("suspicious_keywords", [])
         )
 
@@ -128,15 +134,19 @@ Respond in JSON:
             upiIds=self._extract_upi_ids(conversation),
             phishingLinks=self._extract_urls(conversation),
             phoneNumbers=self._extract_phone_numbers(conversation),
+            emailAddresses=self._extract_emails(conversation),
             suspiciousKeywords=[]
         )
 
+    def _extract_emails(self, text: str) -> List[str]:
+        """Extract email addresses from text."""
+        matches = self.email_pattern.findall(text)
+        return list(set(matches))
+
     def _extract_upi_ids(self, text: str) -> List[str]:
-        """Extract UPI IDs from text."""
+        """Extract UPI IDs from text (username@singleword, no TLD)."""
         matches = self.upi_pattern.findall(text)
-        # Filter to valid UPI patterns (common banks)
-        upi_banks = ['paytm', 'phonepe', 'googlepay', 'gpay', 'ybl', 'okaxis', 'okicici', 'oksbi']
-        return [m for m in matches if any(bank in m.lower() for bank in upi_banks)]
+        return list(set(matches))
 
     def _extract_phone_numbers(self, text: str) -> List[str]:
         """Extract Indian phone numbers."""
@@ -206,6 +216,7 @@ Respond in JSON:
             upiIds=list(set(llm_intel.upiIds + regex_intel.upiIds)),
             phishingLinks=list(set(llm_intel.phishingLinks + regex_intel.phishingLinks)),
             phoneNumbers=list(set(llm_intel.phoneNumbers + regex_intel.phoneNumbers)),
+            emailAddresses=list(set(llm_intel.emailAddresses + regex_intel.emailAddresses)),
             suspiciousKeywords=list(set(llm_intel.suspiciousKeywords))
         )
 
@@ -236,6 +247,7 @@ Respond in JSON:
                 upiIds=data.get("upi_ids", []),
                 phishingLinks=data.get("phishing_links", []),
                 phoneNumbers=data.get("phone_numbers", []),
+                emailAddresses=data.get("email_addresses", []),
                 suspiciousKeywords=data.get("suspicious_keywords", [])
             )
         except Exception as e:

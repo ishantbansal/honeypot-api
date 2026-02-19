@@ -10,7 +10,7 @@ import os
 import time
 
 from app.config import settings
-from app.models.schemas import HoneypotRequest, HoneypotResponse, Message
+from app.models.schemas import HoneypotRequest, HoneypotResponse, EngagementMetrics, Message
 from app.utils.llm_client import create_llm_client, BaseLLMClient
 from app.detection.scam_detector import ScamDetector
 from app.extraction.intelligence_extractor import IntelligenceExtractor
@@ -376,9 +376,21 @@ async def honeypot_endpoint(
         total_time = time.time() - request_start
         logger.info(f"[{session_short}] ✅ Request completed in {total_time:.2f}s (msgs: {session.message_count}, intel: {intel_count})")
 
+        engagement_duration = int(time.time() - session.created_at)
+        agent_notes_str = ". ".join(session.agent_notes[-5:]) if session.agent_notes else f"Scam confidence: {confidence:.2%}, Phase: {session.engagement_phase}"
+
         return HoneypotResponse(
             status="success",
-            reply=response_text
+            reply=response_text,
+            scamDetected=session.scam_detected,
+            totalMessagesExchanged=session.message_count,
+            extractedIntelligence=session.extracted_intelligence,
+            agentNotes=agent_notes_str,
+            engagementMetrics=EngagementMetrics(
+                engagementDurationSeconds=engagement_duration,
+                messagesExchanged=session.message_count,
+                totalTurns=session.message_count // 2
+            )
         )
 
     except Exception as e:
