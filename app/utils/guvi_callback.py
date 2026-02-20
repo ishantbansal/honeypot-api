@@ -1,8 +1,9 @@
 """GUVI callback handler for sending final results."""
 
 import httpx
+import time
 from typing import Dict, Any
-from app.models.schemas import SessionState, GUVICallbackPayload, ExtractedIntelligence
+from app.models.schemas import SessionState, GUVICallbackPayload, ExtractedIntelligence, EngagementMetrics
 
 
 class GUVICallbackHandler:
@@ -32,13 +33,22 @@ class GUVICallbackHandler:
         # Build agent notes summary
         agent_notes = self._build_agent_notes(session_state)
 
+        # Build engagement metrics
+        engagement_duration = int(time.time() - session_state.created_at)
+        engagement_metrics = EngagementMetrics(
+            engagementDurationSeconds=engagement_duration,
+            messagesExchanged=session_state.message_count,
+            totalTurns=session_state.message_count // 2
+        )
+
         # Create payload
         payload = GUVICallbackPayload(
             sessionId=session_state.session_id,
             scamDetected=session_state.scam_detected,
             totalMessagesExchanged=session_state.message_count,
             extractedIntelligence=session_state.extracted_intelligence,
-            agentNotes=agent_notes
+            agentNotes=agent_notes,
+            engagementMetrics=engagement_metrics
         )
 
         # Log payload for verification
@@ -90,12 +100,20 @@ class GUVICallbackHandler:
         """Synchronous version of send_final_result."""
         agent_notes = self._build_agent_notes(session_state)
 
+        engagement_duration = int(time.time() - session_state.created_at)
+        engagement_metrics = EngagementMetrics(
+            engagementDurationSeconds=engagement_duration,
+            messagesExchanged=session_state.message_count,
+            totalTurns=session_state.message_count // 2
+        )
+
         payload = GUVICallbackPayload(
             sessionId=session_state.session_id,
             scamDetected=session_state.scam_detected,
             totalMessagesExchanged=session_state.message_count,
             extractedIntelligence=session_state.extracted_intelligence,
-            agentNotes=agent_notes
+            agentNotes=agent_notes,
+            engagementMetrics=engagement_metrics
         )
 
         try:

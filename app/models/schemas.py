@@ -64,6 +64,7 @@ class HoneypotResponse(BaseModel):
 
 class GUVICallbackPayload(BaseModel):
     """Payload sent to GUVI evaluation endpoint."""
+    status: str = "success"
     sessionId: str
     scamDetected: bool
     totalMessagesExchanged: int
@@ -71,6 +72,7 @@ class GUVICallbackPayload(BaseModel):
     agentNotes: str = Field(
         description="Summary of scammer behavior and tactics"
     )
+    engagementMetrics: Optional[EngagementMetrics] = None
 
 
 class SessionState(BaseModel):

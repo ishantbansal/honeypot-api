@@ -149,6 +149,7 @@ class SessionManager:
             upiIds=list(set(existing.upiIds + new.upiIds)),
             phishingLinks=list(set(existing.phishingLinks + new.phishingLinks)),
             phoneNumbers=list(set(existing.phoneNumbers + new.phoneNumbers)),
+            emailAddresses=list(set(existing.emailAddresses + new.emailAddresses)),
             suspiciousKeywords=list(set(existing.suspiciousKeywords + new.suspiciousKeywords))
         )
 
@@ -180,6 +181,10 @@ class SessionManager:
         if not session:
             return False
 
+        # Already sent callback for this session
+        if session.engagement_phase == "completed":
+            return False
+
         # Must be confirmed scam
         if not session.scam_detected:
             return False
@@ -187,25 +192,22 @@ class SessionManager:
         intel = session.extracted_intelligence
         messages = session.message_count
 
-        # Check if ALL 5 fields are filled
-        all_fields_filled = (
-            len(intel.bankAccounts) > 0 and
-            len(intel.upiIds) > 0 and
-            len(intel.phishingLinks) > 0 and
-            len(intel.phoneNumbers) > 0 and
-            len(intel.suspiciousKeywords) > 0
+        any_intel_found = (
+            len(intel.bankAccounts) > 0 or
+            len(intel.upiIds) > 0 or
+            len(intel.phishingLinks) > 0 or
+            len(intel.phoneNumbers) > 0 or
+            len(intel.emailAddresses) > 0
         )
 
-        # 🏆 CONDITION 1: Perfect extraction - all fields filled
-        if all_fields_filled:
+        # CONDITION 1: Scam confirmed + min messages exchanged + some intel found
+        if any_intel_found and messages >= min_messages:
             return True
 
-        # ⏱️ CONDITION 2: Safety timeout
-        # Must callback eventually even if not all fields filled
+        # CONDITION 2: Safety timeout — must callback even if no intel
         if messages >= max_messages:
             return True
 
-        # Otherwise, keep extracting
         return False
 
     def get_session_summary(self, session_id: str) -> Optional[str]:
