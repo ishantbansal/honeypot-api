@@ -5,6 +5,7 @@ import re
 from typing import List, Dict
 from app.utils.llm_client import BaseLLMClient, LLMMessage
 from app.models.schemas import ExtractedIntelligence
+from app.utils.logger import logger
 
 
 class IntelligenceExtractor:
@@ -13,18 +14,18 @@ class IntelligenceExtractor:
     EXTRACTION_PROMPT = """Extract ALL scammer intelligence from this conversation.
 
 Extract (be aggressive, include all variations):
-1. Bank account numbers (any format: digits, spaces, dashes)
-   - Typically 9-18 digits
-   - DO NOT confuse with phone numbers (phone numbers start with country code like 91 or digits 6-9)
+1. Bank account numbers (any format: digits, spaces, dashes). Typically 9-18 digits.
+   DO NOT confuse with phone numbers (phone numbers start with 6-9 or country code 91).
 2. UPI IDs (username@bank format like xyz@paytm, abc@upi)
 3. Phishing links/URLs (with or without http://)
-4. Phone numbers (any format, normalize to +91XXXXXXXXXX)
-   - Indian phone numbers: 10 digits starting with 6-9
-   - With country code: 91 followed by 10 digits
+4. Phone numbers (normalize to +91XXXXXXXXXX). Indian: 10 digits starting with 6-9.
 5. Email addresses (any email like support@fake.com, offers@scam.in)
 6. Suspicious keywords (urgency, threats, authority words)
+7. Case/reference/ticket IDs (e.g. "CASE-12345", "REF-789", "TKT-001", any alphanumeric ID the scammer provides as a reference)
+8. Policy numbers (e.g. "POL-987654", "LIC/987/654")
+9. Order/transaction numbers (e.g. "ORD-123456", "TXN-789")
 
-IMPORTANT: A number like "918765432109" is a PHONE NUMBER (91 + 10 digits), NOT a bank account.
+IMPORTANT: "918765432109" is a PHONE NUMBER (91 + 10 digits), NOT a bank account.
 
 Conversation:
 {conversation}
@@ -36,7 +37,10 @@ Respond in JSON:
   "phishing_links": [],
   "phone_numbers": [],
   "email_addresses": [],
-  "suspicious_keywords": []
+  "suspicious_keywords": [],
+  "case_ids": [],
+  "policy_numbers": [],
+  "order_numbers": []
 }}"""
 
     def __init__(self, llm_client: BaseLLMClient):
@@ -88,7 +92,7 @@ Respond in JSON:
         try:
             llm_intel = await self._llm_extraction(formatted_conversation)
         except Exception as e:
-            print(f"LLM extraction error: {e}")
+            logger.error(f"LLM extraction error: {e}")
             llm_intel = ExtractedIntelligence()
 
         # SUPPLEMENTARY: Regex extraction (commented out — LLM-only mode)
@@ -123,7 +127,10 @@ Respond in JSON:
             phishingLinks=data.get("phishing_links", []),
             phoneNumbers=data.get("phone_numbers", []),
             emailAddresses=data.get("email_addresses", []),
-            suspiciousKeywords=data.get("suspicious_keywords", [])
+            suspiciousKeywords=data.get("suspicious_keywords", []),
+            caseIds=data.get("case_ids", []),
+            policyNumbers=data.get("policy_numbers", []),
+            orderNumbers=data.get("order_numbers", []),
         )
 
     def _regex_extraction(self, conversation: str) -> ExtractedIntelligence:
@@ -247,10 +254,13 @@ Respond in JSON:
                 phishingLinks=data.get("phishing_links", []),
                 phoneNumbers=data.get("phone_numbers", []),
                 emailAddresses=data.get("email_addresses", []),
-                suspiciousKeywords=data.get("suspicious_keywords", [])
+                suspiciousKeywords=data.get("suspicious_keywords", []),
+                caseIds=data.get("case_ids", []),
+                policyNumbers=data.get("policy_numbers", []),
+                orderNumbers=data.get("order_numbers", []),
             )
         except Exception as e:
-            print(f"LLM extraction error: {e}")
+            logger.error(f"LLM extraction error: {e}")
             llm_intel = ExtractedIntelligence()
 
         # regex_intel = self._regex_extraction(formatted_conversation)

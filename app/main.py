@@ -242,6 +242,7 @@ async def honeypot_endpoint(
             session_id=request.sessionId,
             scam_detected=is_scam and confidence >= settings.scam_confidence_threshold,
             scam_confidence=confidence,
+            scam_type=scam_type,
             extracted_intel=extracted_intel,
             agent_note=scam_type_note if should_add_note else None
         )
@@ -376,8 +377,12 @@ async def honeypot_endpoint(
         return HoneypotResponse(
             status="success",
             reply=response_text,
+            sessionId=request.sessionId,
             scamDetected=session.scam_detected,
+            scamType=session.scam_type,
+            confidenceLevel=round(confidence, 2),
             totalMessagesExchanged=session.message_count,
+            engagementDurationSeconds=engagement_duration,
             extractedIntelligence=session.extracted_intelligence,
             agentNotes=agent_notes_str,
             engagementMetrics=EngagementMetrics(

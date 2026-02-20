@@ -75,6 +75,7 @@ class SessionManager:
         message: Optional[Message] = None,
         scam_detected: bool = None,
         scam_confidence: float = None,
+        scam_type: str = None,
         extracted_intel: ExtractedIntelligence = None,
         agent_note: str = None,
         engagement_phase: str = None,
@@ -114,6 +115,9 @@ class SessionManager:
             if scam_confidence is not None:
                 session.scam_confidence = scam_confidence
 
+            if scam_type is not None:
+                session.scam_type = scam_type
+
             # Update extracted intelligence
             if extracted_intel:
                 session.extracted_intelligence = self._merge_intelligence(
@@ -150,7 +154,10 @@ class SessionManager:
             phishingLinks=list(set(existing.phishingLinks + new.phishingLinks)),
             phoneNumbers=list(set(existing.phoneNumbers + new.phoneNumbers)),
             emailAddresses=list(set(existing.emailAddresses + new.emailAddresses)),
-            suspiciousKeywords=list(set(existing.suspiciousKeywords + new.suspiciousKeywords))
+            suspiciousKeywords=list(set(existing.suspiciousKeywords + new.suspiciousKeywords)),
+            caseIds=list(set(existing.caseIds + new.caseIds)),
+            policyNumbers=list(set(existing.policyNumbers + new.policyNumbers)),
+            orderNumbers=list(set(existing.orderNumbers + new.orderNumbers)),
         )
 
     def should_trigger_callback(

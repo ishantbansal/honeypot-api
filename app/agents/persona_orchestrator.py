@@ -104,21 +104,23 @@ class PersonaOrchestrator:
         """
         missing = []
 
-        if not extracted_intelligence.get('bankAccounts') or len(extracted_intelligence['bankAccounts']) == 0:
-            missing.append("bank account")
-        if not extracted_intelligence.get('upiIds') or len(extracted_intelligence['upiIds']) == 0:
+        if not extracted_intelligence.get('bankAccounts'):
+            missing.append("bank account number")
+        if not extracted_intelligence.get('upiIds'):
             missing.append("UPI ID")
-        if not extracted_intelligence.get('phishingLinks') or len(extracted_intelligence['phishingLinks']) == 0:
+        if not extracted_intelligence.get('phishingLinks'):
             missing.append("website/link")
-        if not extracted_intelligence.get('phoneNumbers') or len(extracted_intelligence['phoneNumbers']) == 0:
+        if not extracted_intelligence.get('phoneNumbers'):
             missing.append("phone number")
+        if not extracted_intelligence.get('emailAddresses'):
+            missing.append("email address")
+        if not extracted_intelligence.get('caseIds'):
+            missing.append("case/reference ID")
 
         if not missing:
-            return "All critical intelligence extracted. Confirm/verify details."
-        elif len(missing) == 4:
-            return "Extract: bank account, UPI ID, website link, and phone number."
+            return "All critical intel extracted. Keep probing for more details and confirm what was shared."
         else:
-            return f"Still need: {', '.join(missing)}. Focus extraction on these."
+            return f"Still need: {', '.join(missing[:3])}. Focus questions on extracting these next."
 
     def generate_response_sync(
         self,

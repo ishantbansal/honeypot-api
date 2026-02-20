@@ -4,6 +4,7 @@ import httpx
 import time
 from typing import Dict, Any
 from app.models.schemas import SessionState, GUVICallbackPayload, ExtractedIntelligence, EngagementMetrics
+from app.utils.logger import logger
 
 
 class GUVICallbackHandler:
@@ -45,16 +46,16 @@ class GUVICallbackHandler:
         payload = GUVICallbackPayload(
             sessionId=session_state.session_id,
             scamDetected=session_state.scam_detected,
+            scamType=session_state.scam_type,
+            confidenceLevel=round(session_state.scam_confidence, 2),
             totalMessagesExchanged=session_state.message_count,
+            engagementDurationSeconds=engagement_duration,
             extractedIntelligence=session_state.extracted_intelligence,
             agentNotes=agent_notes,
             engagementMetrics=engagement_metrics
         )
 
-        # Log payload for verification
-        print(f"\n[GUVI CALLBACK PAYLOAD] Sending to {self.callback_url}:")
-        print(payload.model_dump_json(indent=2))
-        print("-" * 50 + "\n")
+        logger.info(f"[GUVI CALLBACK] Sending to {self.callback_url}: {payload.model_dump_json()}")
 
         # Send POST request
         try:
@@ -110,7 +111,10 @@ class GUVICallbackHandler:
         payload = GUVICallbackPayload(
             sessionId=session_state.session_id,
             scamDetected=session_state.scam_detected,
+            scamType=session_state.scam_type,
+            confidenceLevel=round(session_state.scam_confidence, 2),
             totalMessagesExchanged=session_state.message_count,
+            engagementDurationSeconds=engagement_duration,
             extractedIntelligence=session_state.extracted_intelligence,
             agentNotes=agent_notes,
             engagementMetrics=engagement_metrics
