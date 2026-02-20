@@ -169,17 +169,14 @@ class SessionManager:
         """
         Determine if GUVI callback should be triggered.
 
-        STRATEGY: Callback when ALL 5 intelligence fields are filled.
-        Maximize extraction by continuing conversation until complete or timeout.
-
-        Triggers if:
-        1. ALL 5 fields filled (perfect extraction)
-        2. Safety timeout reached (must submit something)
+        STRATEGY: Send callback on every turn once scam is confirmed so the
+        final callback always reflects the most complete conversation state.
+        GUVI evaluates the last submitted result after all turns complete.
 
         Args:
             session_id: Session identifier
-            min_messages: Ignored (kept for API compatibility)
-            max_messages: Maximum messages before forcing callback (default 20)
+            min_messages: Minimum messages before first callback
+            max_messages: Force callback even if scam not confirmed
 
         Returns:
             True if callback should be triggered
@@ -188,31 +185,12 @@ class SessionManager:
         if not session:
             return False
 
-        # Already sent callback for this session
-        if session.engagement_phase == "completed":
-            return False
-
-        # Must be confirmed scam
-        if not session.scam_detected:
-            return False
-
-        intel = session.extracted_intelligence
-        messages = session.message_count
-
-        any_intel_found = (
-            len(intel.bankAccounts) > 0 or
-            len(intel.upiIds) > 0 or
-            len(intel.phishingLinks) > 0 or
-            len(intel.phoneNumbers) > 0 or
-            len(intel.emailAddresses) > 0
-        )
-
-        # CONDITION 1: Scam confirmed + min messages exchanged + some intel found
-        if any_intel_found and messages >= min_messages:
+        # Send on every turn once scam is confirmed and min threshold reached
+        if session.scam_detected and session.message_count >= min_messages:
             return True
 
-        # CONDITION 2: Safety timeout — must callback even if no intel
-        if messages >= max_messages:
+        # Safety: force callback at max messages even if scam not confirmed
+        if session.message_count >= max_messages:
             return True
 
         return False

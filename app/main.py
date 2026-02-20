@@ -352,16 +352,7 @@ async def honeypot_endpoint(
                 intel_count=intel_count
             )
 
-            if callback_result["success"]:
-                # Mark session as completed
-                session_manager.update_session(
-                    session_id=request.sessionId,
-                    engagement_phase="completed"
-                )
-                # Update session in CSV as completed
-                session = session_manager.get_session(request.sessionId)
-                csv_logger.log_session(session, completed=True)
-            else:
+            if not callback_result["success"]:
                 logger.error(
                     f"GUVI callback failed for session {request.sessionId}: "
                     f"{callback_result.get('message')}"
