@@ -259,7 +259,7 @@ async def honeypot_endpoint(
         logger.info(f"[{session_short}] ✓ Persona '{persona_name}' generated response ({time.time() - step_start:.2f}s)")
 
         if DEBUG:
-            print(f"[DEBUG] After persona generation: response_text='{response_text}', persona='{persona_name}'")
+            logger.debug(f"After persona generation: response_text='{response_text}', persona='{persona_name}'")
 
         # Log persona selection
         log_persona(
@@ -282,7 +282,7 @@ async def honeypot_endpoint(
             logger.warning(f"Session {request.sessionId}: Response warnings: {warnings}")
 
         if DEBUG:
-            print(f"[DEBUG] After validation: is_valid={is_valid}, fixed_response='{fixed_response}', warnings={warnings}")
+            logger.debug(f"After validation: is_valid={is_valid}, fixed_response='{fixed_response}', warnings={warnings}")
 
         # Use fixed response
         response_text = fixed_response
@@ -341,12 +341,6 @@ async def honeypot_endpoint(
         )
 
         if should_callback:
-            intel = session.extracted_intelligence
-            intel_count = (
-                len(intel.bankAccounts) + len(intel.upiIds) +
-                len(intel.phishingLinks) + len(intel.phoneNumbers)
-            )
-
             callback_result = await guvi_callback.send_final_result(session)
 
             # Log callback result

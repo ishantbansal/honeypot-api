@@ -24,3 +24,31 @@ data/
 # OS
 .DS_Store
 Thumbs.db
+
+# AI-generated docs (local reference only, not for repo)
+CLAUDE.md
+ANALYTICS_IMPLEMENTATION.md
+BOT_DETECTION_ANALYSIS.md
+CONCURRENCY_SAFETY.md
+DASHBOARD_GUIDE.md
+DEPLOYMENT_READY.md
+GUARDRAILS.md
+IMPLEMENTATION_COMPLETE.md
+IMPLEMENTATION_SUMMARY.md
+MULTI_WORKER_SETUP.md
+NEXT_ENHANCEMENTS.md
+POST_FINALE_ROADMAP.md
+POST_ROUND1_IMPROVEMENTS.md
+PPT_CONTENT.md
+PRESENTATION_GUIDE.md
+problem_statement.md
+RATE_LIMITING_GUIDE.md
+TECHNICAL_DETAILS.md
+TROUBLESHOOTING.md
+files/slides.md
+
+# Evaluation/ad-hoc test scripts in root (not production code)
+/test_*.py
+
+# Local-only files (demos, PDFs, presentations)
+files/
