@@ -21,9 +21,9 @@ Extract (be aggressive, include all variations):
 4. Phone numbers (normalize to +91XXXXXXXXXX). Indian: 10 digits starting with 6-9.
 5. Email addresses (any email like support@fake.com, offers@scam.in)
 6. Suspicious keywords (urgency, threats, authority words)
-7. Case/reference/ticket IDs (e.g. "CASE-12345", "REF-789", "TKT-001", any alphanumeric ID the scammer provides as a reference)
-8. Policy numbers (e.g. "POL-987654", "LIC/987/654")
-9. Order/transaction numbers (e.g. "ORD-123456", "TXN-789")
+7. Case/reference/ticket IDs — LOOK CAREFULLY for patterns like "CASE-12345", "REF-789", "TKT-001", "Case ID: X", "reference number", "complaint ID", "ticket number", any alphanumeric ID presented as a case or reference
+8. Policy numbers — patterns like "POL-987654", "LIC/987/654", "policy number", "policy ID"
+9. Order/transaction numbers — patterns like "ORD-123456", "TXN-789", "order ID", "transaction ID"
 
 IMPORTANT: "918765432109" is a PHONE NUMBER (91 + 10 digits), NOT a bank account.
 
@@ -53,8 +53,8 @@ Respond in JSON:
         self.llm_client = llm_client
 
         # Regex patterns as fallback (more aggressive to catch all variations)
-        # UPI IDs: username@singleword (no dot in domain part, distinguishes from emails)
-        self.upi_pattern = re.compile(r'\b[\w.-]+@[A-Za-z0-9]+\b')
+        # UPI IDs: username@singleword with no hyphen in domain (distinguishes from emails like x@sbi-fraud.com)
+        self.upi_pattern = re.compile(r'\b[\w.-]+@[A-Za-z0-9]+\b(?![-.])')
         # Emails: user@domain.tld (has dot + TLD in domain part)
         self.email_pattern = re.compile(r'\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b')
 
