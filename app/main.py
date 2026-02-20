@@ -157,6 +157,24 @@ async def honeypot_endpoint(
         logger.info(f"[{session_short}] ▶️  Processing message for session: {request.sessionId}")
         logger.info(f"[{session_short}] STEP 1/7: Received message from {request.message.sender}")
 
+        # Edge case: empty or whitespace-only message
+        if not request.message.text or not request.message.text.strip():
+            logger.warning(f"[{session_short}] Empty message received, returning fallback")
+            return HoneypotResponse(
+                status="success",
+                reply="hello? i didnt get that. can u repeat pls?",
+                sessionId=request.sessionId,
+                scamDetected=False,
+                totalMessagesExchanged=0,
+                engagementDurationSeconds=0,
+                agentNotes="Empty message received"
+            )
+
+        # Truncate extremely long messages to avoid LLM token overflow
+        if len(request.message.text) > 2000:
+            request.message.text = request.message.text[:2000]
+            logger.warning(f"[{session_short}] Message truncated to 2000 chars")
+
         # Log incoming message with structured logging
         log_message(
             session_id=request.sessionId,
@@ -231,12 +249,22 @@ async def honeypot_endpoint(
             )
 
         # Update session with detection results and extracted intelligence
-        # Only add scam type note if it's new or changed
         scam_type = scam_details.get('scam_type') or 'unknown'
         scam_type_note = f"Scam type: {scam_type}"
-
-        # Check if this exact scam type note was already added (exact match to avoid duplicates)
         should_add_note = scam_type_note not in session.agent_notes
+
+        # Extract red flags from detection details
+        threat_indicators = scam_details.get('threat_indicators', []) or []
+        suspicious_keywords = scam_details.get('suspicious_keywords', []) or []
+        red_flags = list(set(threat_indicators + suspicious_keywords))
+
+        # Determine engagement phase based on conversation progress
+        if confidence >= 0.85:
+            new_phase = "extraction"
+        elif confidence >= 0.5:
+            new_phase = "engagement"
+        else:
+            new_phase = "detection"
 
         session = session_manager.update_session(
             session_id=request.sessionId,
@@ -244,7 +272,9 @@ async def honeypot_endpoint(
             scam_confidence=confidence,
             scam_type=scam_type,
             extracted_intel=extracted_intel,
-            agent_note=scam_type_note if should_add_note else None
+            agent_note=scam_type_note if should_add_note else None,
+            engagement_phase=new_phase,
+            red_flags=red_flags
         )
 
         # Generate response using appropriate persona (with extraction targeting)
@@ -255,7 +285,8 @@ async def honeypot_endpoint(
             conversation_history=[msg.model_dump() for msg in session.conversation_history],
             scam_confidence=confidence,
             scam_details=scam_details,
-            extracted_intelligence=session.extracted_intelligence.model_dump()
+            extracted_intelligence=session.extracted_intelligence.model_dump(),
+            detected_red_flags=session.detected_red_flags
         )
         logger.info(f"[{session_short}] ✓ Persona '{persona_name}' generated response ({time.time() - step_start:.2f}s)")
 
@@ -363,7 +394,12 @@ async def honeypot_endpoint(
         logger.info(f"[{session_short}] ✅ Request completed in {total_time:.2f}s (msgs: {session.message_count}, intel: {intel_count})")
 
         engagement_duration = int(time.time() - session.created_at)
-        agent_notes_str = ". ".join(session.agent_notes[-5:]) if session.agent_notes else f"Scam confidence: {confidence:.2%}, Phase: {session.engagement_phase}"
+        notes_parts = []
+        if session.detected_red_flags:
+            notes_parts.append(f"Red flags: {', '.join(session.detected_red_flags[:5])}")
+        if session.agent_notes:
+            notes_parts.extend(session.agent_notes[-3:])
+        agent_notes_str = ". ".join(notes_parts) if notes_parts else f"Scam confidence: {confidence:.2%}, Phase: {session.engagement_phase}"
 
         return HoneypotResponse(
             status="success",

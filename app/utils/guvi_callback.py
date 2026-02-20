@@ -177,7 +177,12 @@ class GUVICallbackHandler:
             f"Engagement phase: {session_state.engagement_phase}"
         )
 
-        # Intelligence summary
+        # Red flags detected across conversation
+        if session_state.detected_red_flags:
+            flags = session_state.detected_red_flags[:8]  # Top 8
+            notes.append(f"Red flags detected: {', '.join(flags)}")
+
+        # Full intelligence summary (all 9 types)
         intel = session_state.extracted_intelligence
         intel_summary = []
         if intel.bankAccounts:
@@ -188,13 +193,21 @@ class GUVICallbackHandler:
             intel_summary.append(f"{len(intel.phishingLinks)} phishing links")
         if intel.phoneNumbers:
             intel_summary.append(f"{len(intel.phoneNumbers)} phone numbers")
+        if intel.emailAddresses:
+            intel_summary.append(f"{len(intel.emailAddresses)} emails")
+        if intel.caseIds:
+            intel_summary.append(f"{len(intel.caseIds)} case IDs")
+        if intel.policyNumbers:
+            intel_summary.append(f"{len(intel.policyNumbers)} policy numbers")
+        if intel.orderNumbers:
+            intel_summary.append(f"{len(intel.orderNumbers)} order numbers")
 
         if intel_summary:
             notes.append(f"Extracted: {', '.join(intel_summary)}")
 
         # Add stored agent notes
         if session_state.agent_notes:
-            notes.extend(session_state.agent_notes[-5:])  # Last 5 notes
+            notes.extend(session_state.agent_notes[-3:])
 
         return ". ".join(notes)
 

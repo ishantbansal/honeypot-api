@@ -79,7 +79,8 @@ class SessionManager:
         extracted_intel: ExtractedIntelligence = None,
         agent_note: str = None,
         engagement_phase: str = None,
-        persona_used: str = None
+        persona_used: str = None,
+        red_flags: list = None
     ) -> SessionState:
         """
         Update session state with new information.
@@ -132,6 +133,12 @@ class SessionManager:
             # Update engagement phase
             if engagement_phase:
                 session.engagement_phase = engagement_phase
+
+            # Accumulate red flags (deduplicated)
+            if red_flags:
+                for flag in red_flags:
+                    if flag and flag not in session.detected_red_flags:
+                        session.detected_red_flags.append(flag)
 
             # Store persona context
             if persona_used:

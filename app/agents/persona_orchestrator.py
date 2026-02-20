@@ -59,7 +59,8 @@ class PersonaOrchestrator:
         conversation_history: List[Dict[str, str]],
         scam_confidence: float,
         scam_details: Dict = None,
-        extracted_intelligence: Dict = None
+        extracted_intelligence: Dict = None,
+        detected_red_flags: list = None
     ) -> tuple[str, str]:
         """
         Generate response using appropriate persona with dynamic targeting.
@@ -79,8 +80,10 @@ class PersonaOrchestrator:
 
         # Build extraction context for honeypot persona
         extraction_context = None
-        if scam_confidence >= self.HONEYPOT_THRESHOLD and extracted_intelligence:
-            extraction_context = self._build_extraction_context(extracted_intelligence)
+        if scam_confidence >= self.SKEPTICAL_THRESHOLD and extracted_intelligence:
+            extraction_context = self._build_extraction_context(
+                extracted_intelligence, detected_red_flags or []
+            )
 
         # Generate response with context
         response = await persona.generate_response(
@@ -92,12 +95,13 @@ class PersonaOrchestrator:
 
         return response, persona.get_persona_name()
 
-    def _build_extraction_context(self, extracted_intelligence: Dict) -> str:
+    def _build_extraction_context(self, extracted_intelligence: Dict, detected_red_flags: list = None) -> str:
         """
-        Build context about what intelligence is still needed.
+        Build context about what intelligence is still needed, guided by detected red flags.
 
         Args:
             extracted_intelligence: Current extracted intelligence
+            detected_red_flags: Red flags detected so far (maps to specific intel targets)
 
         Returns:
             Context string for persona
@@ -116,11 +120,33 @@ class PersonaOrchestrator:
             missing.append("email address")
         if not extracted_intelligence.get('caseIds'):
             missing.append("case/reference ID")
+        if not extracted_intelligence.get('policyNumbers'):
+            missing.append("policy number")
+        if not extracted_intelligence.get('orderNumbers'):
+            missing.append("order/transaction ID")
+
+        # Map detected red flags to priority extraction targets
+        priority = []
+        flags_lower = [f.lower() for f in (detected_red_flags or [])]
+        if any(w in f for f in flags_lower for w in ["fee", "pay", "transfer", "amount"]):
+            if "UPI ID" in missing:
+                priority.append("UPI ID (they're asking for payment)")
+            if "bank account number" in missing:
+                priority.append("bank account (payment target)")
+        if any(w in f for f in flags_lower for w in ["employee", "agent", "officer", "staff"]):
+            if "case/reference ID" in missing:
+                priority.append("employee/case ID (verify their identity)")
+        if any(w in f for f in flags_lower for w in ["link", "url", "click", "verify", "website"]):
+            if "website/link" in missing:
+                priority.append("the exact link/URL they want you to click")
 
         if not missing:
-            return "All critical intel extracted. Keep probing for more details and confirm what was shared."
-        else:
-            return f"Still need: {', '.join(missing[:3])}. Focus questions on extracting these next."
+            return "All critical intel extracted. Keep probing: ask for supervisor name, company address, or alternate contact."
+
+        context = f"Still need: {', '.join(missing[:4])}."
+        if priority:
+            context += f" PRIORITY based on red flags: {', '.join(priority[:2])}."
+        return context
 
     def generate_response_sync(
         self,
