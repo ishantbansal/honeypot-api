@@ -3,6 +3,7 @@
 import json
 from typing import Tuple, List, Dict
 from app.utils.llm_client import BaseLLMClient, LLMMessage
+from app.utils.logger import logger
 
 
 class ScamDetector:
@@ -95,11 +96,10 @@ Analysis:"""
             return is_scam, confidence, details
 
         except json.JSONDecodeError as e:
-            # Fallback to basic pattern matching if JSON parsing fails
-            print(f"JSON parsing error: {e}")
+            logger.error(f"JSON parsing error in scam detection: {e}")
             return self._fallback_detection(message)
         except Exception as e:
-            print(f"Detection error: {e}")
+            logger.error(f"Scam detection error: {e}")
             return self._fallback_detection(message)
 
     def _build_detection_prompt(
@@ -189,5 +189,5 @@ Analysis:"""
             return is_scam, confidence, details
 
         except (json.JSONDecodeError, Exception) as e:
-            print(f"Detection error: {e}")
+            logger.error(f"Scam detection error: {e}")
             return self._fallback_detection(message)

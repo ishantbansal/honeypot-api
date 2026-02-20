@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # Agent Configuration
     max_conversation_turns: int = 10
-    scam_confidence_threshold: float = 0.7
+    scam_confidence_threshold: float = 0.5
     min_messages_before_callback: int = 2
 
     # Human Behavior Simulation

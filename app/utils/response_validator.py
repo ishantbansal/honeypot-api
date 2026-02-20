@@ -3,6 +3,7 @@
 import json
 from typing import Tuple, List
 from app.utils.llm_client import BaseLLMClient, LLMMessage
+from app.utils.logger import logger
 
 
 class ResponseValidator:
@@ -83,7 +84,7 @@ Respond in JSON:
 
         except Exception as e:
             # If validation fails, pass through original response
-            print(f"Validation error: {e}")
+            logger.error(f"Validation error: {e}")
             return True, response, ["Validation failed - passed through"]
 
     def validate_response_sync(
@@ -117,7 +118,7 @@ Respond in JSON:
             return True, fixed_response, violations
 
         except Exception as e:
-            print(f"Validation error: {e}")
+            logger.error(f"Validation error: {e}")
             return True, response, ["Validation failed - passed through"]
 
 

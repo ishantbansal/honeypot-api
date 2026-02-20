@@ -95,12 +95,9 @@ Respond in JSON:
             logger.error(f"LLM extraction error: {e}")
             llm_intel = ExtractedIntelligence()
 
-        # SUPPLEMENTARY: Regex extraction (commented out — LLM-only mode)
-        # regex_intel = self._regex_extraction(formatted_conversation)
-        # merged_intel = self._merge_intelligence(llm_intel, regex_intel)
-        # return merged_intel
-
-        return llm_intel
+        # SUPPLEMENTARY: Regex extraction as safety net for structured data
+        regex_intel = self._regex_extraction(formatted_conversation)
+        return self._merge_intelligence(llm_intel, regex_intel)
 
     async def _llm_extraction(self, conversation: str) -> ExtractedIntelligence:
         """Use LLM to extract intelligence."""
@@ -263,6 +260,5 @@ Respond in JSON:
             logger.error(f"LLM extraction error: {e}")
             llm_intel = ExtractedIntelligence()
 
-        # regex_intel = self._regex_extraction(formatted_conversation)
-        # return self._merge_intelligence(llm_intel, regex_intel)
-        return llm_intel
+        regex_intel = self._regex_extraction(formatted_conversation)
+        return self._merge_intelligence(llm_intel, regex_intel)

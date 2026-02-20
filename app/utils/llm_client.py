@@ -3,7 +3,10 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 import json
+import logging
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -149,7 +152,7 @@ class OpenAIClient(BaseLLMClient):
             return content if content is not None else ""
 
         except Exception as e:
-            print(f"[LLM ERROR] OpenAI API call failed: {type(e).__name__} - {str(e)}")
+            logger.error(f"[LLM ERROR] OpenAI API call failed: {type(e).__name__} - {str(e)}")
             raise  # Re-raise so calling code can handle it
 
     def generate_sync(
@@ -193,7 +196,7 @@ class OpenAIClient(BaseLLMClient):
             return content if content is not None else ""
 
         except Exception as e:
-            print(f"[LLM ERROR] OpenAI API call failed: {type(e).__name__} - {str(e)}")
+            logger.error(f"[LLM ERROR] OpenAI API call failed: {type(e).__name__} - {str(e)}")
             raise  # Re-raise so calling code can handle it
 
 
@@ -261,7 +264,7 @@ class AzureOpenAIClient(BaseLLMClient):
             return content if content is not None else ""
 
         except Exception as e:
-            print(f"[LLM ERROR] Azure OpenAI API call failed: {type(e).__name__} - {str(e)}")
+            logger.error(f"[LLM ERROR] Azure OpenAI API call failed: {type(e).__name__} - {str(e)}")
             raise
 
     def generate_sync(
@@ -300,7 +303,7 @@ class AzureOpenAIClient(BaseLLMClient):
             return content if content is not None else ""
 
         except Exception as e:
-            print(f"[LLM ERROR] Azure OpenAI API call failed: {type(e).__name__} - {str(e)}")
+            logger.error(f"[LLM ERROR] Azure OpenAI API call failed: {type(e).__name__} - {str(e)}")
             raise
 
 
@@ -357,7 +360,7 @@ class AnthropicClient(BaseLLMClient):
             return content if content is not None else ""
 
         except Exception as e:
-            print(f"[LLM ERROR] Anthropic API call failed: {type(e).__name__} - {str(e)}")
+            logger.error(f"[LLM ERROR] Anthropic API call failed: {type(e).__name__} - {str(e)}")
             raise
 
     def generate_sync(
