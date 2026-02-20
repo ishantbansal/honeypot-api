@@ -70,9 +70,9 @@ class BaseLLMClient(ABC):
 
     @abstractmethod
     @retry(
-        stop=stop_after_attempt(6),
-        wait=wait_random_exponential(min=1, max=60),
-        retry=retry_if_exception_type((RateLimitError, APITimeoutError, APIConnectionError)),
+        stop=stop_after_attempt(2),
+        wait=wait_random_exponential(min=1, max=3),
+        retry=retry_if_exception_type((RateLimitError,)),
         reraise=True
     )
     def generate_sync(
@@ -100,9 +100,9 @@ class OpenAIClient(BaseLLMClient):
         self.model = model
 
     @retry(
-        stop=stop_after_attempt(6),
-        wait=wait_random_exponential(min=1, max=60),
-        retry=retry_if_exception_type((RateLimitError, APITimeoutError, APIConnectionError)),
+        stop=stop_after_attempt(2),
+        wait=wait_random_exponential(min=1, max=3),
+        retry=retry_if_exception_type((RateLimitError,)),
         reraise=True
     )
     async def generate(
@@ -221,9 +221,9 @@ class AzureOpenAIClient(BaseLLMClient):
         self.deployment_name = deployment_name
 
     @retry(
-        stop=stop_after_attempt(6),
-        wait=wait_random_exponential(min=1, max=60),
-        retry=retry_if_exception_type((RateLimitError, APITimeoutError, APIConnectionError)),
+        stop=stop_after_attempt(2),
+        wait=wait_random_exponential(min=1, max=3),
+        retry=retry_if_exception_type((RateLimitError,)),
         reraise=True
     )
     async def generate(
@@ -317,8 +317,8 @@ class AnthropicClient(BaseLLMClient):
         self.model = model
 
     @retry(
-        stop=stop_after_attempt(6),
-        wait=wait_random_exponential(min=1, max=60),
+        stop=stop_after_attempt(2),
+        wait=wait_random_exponential(min=1, max=3),
         retry=retry_if_exception_type((AnthropicRateLimitError,)),
         reraise=True
     )
