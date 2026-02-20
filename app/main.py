@@ -232,7 +232,7 @@ async def honeypot_endpoint(
 
         # Update session with detection results and extracted intelligence
         # Only add scam type note if it's new or changed
-        scam_type = scam_details.get('scam_type', 'unknown')
+        scam_type = scam_details.get('scam_type') or 'unknown'
         scam_type_note = f"Scam type: {scam_type}"
 
         # Check if this exact scam type note was already added (exact match to avoid duplicates)
