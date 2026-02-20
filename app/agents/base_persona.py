@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict
 from app.utils.llm_client import BaseLLMClient, LLMMessage
+from app.utils.logger import logger
 
 
 class BasePersonaAgent(ABC):
@@ -75,13 +76,16 @@ class BasePersonaAgent(ABC):
                 messages[-1].content += f"\n\n[Internal context: {context_hint}]"
 
         # Generate response
-        response = await self.llm_client.generate(
-            messages=messages,
-            temperature=0.8,  # Higher temperature for natural variation
-            max_tokens=300
-        )
-
-        return response.strip()
+        try:
+            response = await self.llm_client.generate(
+                messages=messages,
+                temperature=0.8,  # Higher temperature for natural variation
+                max_tokens=300
+            )
+            return response.strip()
+        except Exception as e:
+            logger.error(f"Persona generation error ({self.get_persona_name()}): {e}")
+            return self._fallback_response()
 
     def generate_response_sync(
         self,
@@ -115,13 +119,20 @@ class BasePersonaAgent(ABC):
             if context_hint:
                 messages[-1].content += f"\n\n[Internal context: {context_hint}]"
 
-        response = self.llm_client.generate_sync(
-            messages=messages,
-            temperature=0.8,
-            max_tokens=300
-        )
+        try:
+            response = self.llm_client.generate_sync(
+                messages=messages,
+                temperature=0.8,
+                max_tokens=300
+            )
+            return response.strip()
+        except Exception as e:
+            logger.error(f"Persona generation error ({self.get_persona_name()}): {e}")
+            return self._fallback_response()
 
-        return response.strip()
+    def _fallback_response(self) -> str:
+        """Safe fallback if LLM is unavailable."""
+        return "sorry wait... can u repeat that? im a bit confused right now"
 
     def _build_context_hint(self, scam_details: Dict) -> str:
         """Build context hint from scam detection details."""
