@@ -69,6 +69,25 @@ Respond in JSON:
         # Bank account: flexible pattern to catch numbers with spaces/dashes
         self.account_pattern = re.compile(r'\b\d[\d\s-]{8,20}\d\b')
 
+        # Case/reference IDs: CASE-4421, REF-789, TKT-9988, INC-001, etc.
+        # ID part must contain at least one digit to avoid false positives like "complaint reference"
+        self.case_id_pattern = re.compile(
+            r'\b(?:CASE|REF|TKT|TICKET|CMP|COMPLAINT|INC|INCIDENT|SR|CLAIM|CLM)[-/][A-Z0-9]*\d[A-Z0-9]*\b',
+            re.IGNORECASE
+        )
+
+        # Policy numbers: POL-987654, LIC/987/654 — require - or / separator
+        self.policy_pattern = re.compile(
+            r'\b(?:POL|POLICY|LIC|LICENCE|LICENSE|PNO)[-/][A-Z0-9]*\d[A-Z0-9]*(?:[/-][A-Z0-9]+)*\b',
+            re.IGNORECASE
+        )
+
+        # Order/transaction numbers: ORD-123456, TXN-789 — require - or / separator
+        self.order_pattern = re.compile(
+            r'\b(?:ORD|ORDER|TXN|TRANSACTION|INV|INVOICE|BOOKING|BKG)[-/][A-Z0-9]*\d[A-Z0-9]*\b',
+            re.IGNORECASE
+        )
+
     async def extract_intelligence(
         self,
         conversation_history: List[Dict[str, str]]
@@ -138,7 +157,10 @@ Respond in JSON:
             phishingLinks=self._extract_urls(conversation),
             phoneNumbers=self._extract_phone_numbers(conversation),
             emailAddresses=self._extract_emails(conversation),
-            suspiciousKeywords=[]
+            suspiciousKeywords=[],
+            caseIds=self._extract_case_ids(conversation),
+            policyNumbers=self._extract_policy_numbers(conversation),
+            orderNumbers=self._extract_order_numbers(conversation),
         )
 
     def _extract_emails(self, text: str) -> List[str]:
@@ -198,6 +220,21 @@ Respond in JSON:
                 if not is_phone:
                     cleaned.append(digits_only)
         return list(set(cleaned))
+
+    def _extract_case_ids(self, text: str) -> List[str]:
+        """Extract case/reference/ticket IDs from text."""
+        matches = self.case_id_pattern.findall(text)
+        return list(set(m.strip() for m in matches))
+
+    def _extract_policy_numbers(self, text: str) -> List[str]:
+        """Extract policy numbers from text."""
+        matches = self.policy_pattern.findall(text)
+        return list(set(m.strip() for m in matches))
+
+    def _extract_order_numbers(self, text: str) -> List[str]:
+        """Extract order/transaction numbers from text."""
+        matches = self.order_pattern.findall(text)
+        return list(set(m.strip() for m in matches))
 
     def _format_conversation(self, history: List[Dict[str, str]]) -> str:
         """Format conversation for LLM analysis."""
