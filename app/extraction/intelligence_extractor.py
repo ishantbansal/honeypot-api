@@ -257,7 +257,10 @@ Respond in JSON:
             phishingLinks=list(set(llm_intel.phishingLinks + regex_intel.phishingLinks)),
             phoneNumbers=list(set(llm_intel.phoneNumbers + regex_intel.phoneNumbers)),
             emailAddresses=list(set(llm_intel.emailAddresses + regex_intel.emailAddresses)),
-            suspiciousKeywords=list(set(llm_intel.suspiciousKeywords))
+            suspiciousKeywords=list(set(llm_intel.suspiciousKeywords)),
+            caseIds=list(set(llm_intel.caseIds + regex_intel.caseIds)),
+            policyNumbers=list(set(llm_intel.policyNumbers + regex_intel.policyNumbers)),
+            orderNumbers=list(set(llm_intel.orderNumbers + regex_intel.orderNumbers)),
         )
 
     def extract_intelligence_sync(
