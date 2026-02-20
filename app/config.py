@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     min_messages_before_callback: int = 5
 
     # Human Behavior Simulation
-    enable_human_delay: bool = True  # Set to False for fast testing
+    enable_human_delay: bool = False  # Set to True to enable human-like delays
 
     # Dashboard Configuration
     dashboard_password: str = "admin123"  # Change in .env for production

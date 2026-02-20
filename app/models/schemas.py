@@ -49,7 +49,7 @@ class ExtractedIntelligence(BaseModel):
 class EngagementMetrics(BaseModel):
     """Engagement quality metrics for GUVI scoring."""
     engagementDurationSeconds: int = 0
-    messagesExchanged: int = 0
+    totalMessagesExchanged: int = 0
     totalTurns: int = 0
 
 

@@ -387,7 +387,7 @@ async def honeypot_endpoint(
             agentNotes=agent_notes_str,
             engagementMetrics=EngagementMetrics(
                 engagementDurationSeconds=engagement_duration,
-                messagesExchanged=session.message_count,
+                totalMessagesExchanged=session.message_count,
                 totalTurns=session.message_count // 2
             )
         )

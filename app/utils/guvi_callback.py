@@ -38,7 +38,7 @@ class GUVICallbackHandler:
         engagement_duration = int(time.time() - session_state.created_at)
         engagement_metrics = EngagementMetrics(
             engagementDurationSeconds=engagement_duration,
-            messagesExchanged=session_state.message_count,
+            totalMessagesExchanged=session_state.message_count,
             totalTurns=session_state.message_count // 2
         )
 
@@ -104,7 +104,7 @@ class GUVICallbackHandler:
         engagement_duration = int(time.time() - session_state.created_at)
         engagement_metrics = EngagementMetrics(
             engagementDurationSeconds=engagement_duration,
-            messagesExchanged=session_state.message_count,
+            totalMessagesExchanged=session_state.message_count,
             totalTurns=session_state.message_count // 2
         )
 

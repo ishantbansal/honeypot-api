@@ -2,15 +2,23 @@
 
 An AI-powered honeypot system that detects scam messages and autonomously engages scammers to extract intelligence.
 
+## Tech Stack
+
+- **Language/Framework**: Python 3.11, FastAPI, Uvicorn
+- **LLM/AI**: OpenAI (GPT-4o), Azure OpenAI, Anthropic Claude — model-agnostic
+- **Validation**: Pydantic v2
+- **HTTP Client**: httpx (async)
+- **Session State**: In-memory with Pydantic models
+- **Logging**: Loguru + CSV export
+
 ## Features
 
-- 🔍 **Scam Detection**: Advanced pattern matching and AI-based detection
-- 🤖 **Multi-Agent System**: Specialized agents for persona, strategy, and intelligence extraction
-- 💬 **Multi-Turn Conversations**: Handles complex conversation flows
-- 🎭 **Believable Personas**: Human-like responses that don't reveal detection
-- 📊 **Intelligence Extraction**: Extracts bank accounts, UPI IDs, phishing links, phone numbers
-- 🔒 **API Key Authentication**: Secure access control
-- 📡 **Automatic Reporting**: Sends final results to GUVI evaluation endpoint
+- **Scam Detection**: LLM-based confidence scoring (0.0–1.0) with full conversation context
+- **Progressive Persona System**: 3 AI agents activate based on confidence (Normal → Skeptical → Honeypot)
+- **Intelligence Extraction**: LLM + regex extraction of bank accounts, UPI IDs, phishing links, phone numbers, emails, case IDs, policy numbers, order numbers
+- **Multi-Turn Conversations**: Handles up to 10 turns per session
+- **API Key Authentication**: Secure access via `x-api-key` header
+- **Automatic Reporting**: Sends final results to GUVI evaluation endpoint after session completes
 
 ## Architecture
 
@@ -185,33 +193,46 @@ curl -X POST http://localhost:8000/api/v1/honeypot \
 ```
 honeypot-api/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI application entry point
-│   ├── config.py               # Configuration management
+│   ├── main.py                        # FastAPI application entry point
+│   ├── config.py                      # Configuration management
 │   ├── agents/
-│   │   ├── __init__.py
-│   │   ├── persona_agent.py    # Victim persona agent
-│   │   ├── strategy_agent.py   # Engagement strategy
-│   │   └── extractor_agent.py  # Intelligence extraction
+│   │   ├── base_persona.py            # Base class for all persona agents
+│   │   ├── normal_user_persona.py     # Low confidence: confused, worried user
+│   │   ├── skeptical_user_persona.py  # Medium confidence: cautious, questioning
+│   │   ├── honeypot_persona.py        # High confidence: active intel extraction
+│   │   └── persona_orchestrator.py   # Selects persona based on confidence
 │   ├── detection/
-│   │   ├── __init__.py
-│   │   └── scam_detector.py    # Scam detection logic
+│   │   └── scam_detector.py           # LLM-based scam detection
 │   ├── extraction/
-│   │   ├── __init__.py
-│   │   └── patterns.py         # Regex patterns for extraction
+│   │   └── intelligence_extractor.py  # LLM + regex intel extraction
 │   ├── models/
-│   │   ├── __init__.py
-│   │   └── schemas.py          # Pydantic models
+│   │   └── schemas.py                 # Pydantic request/response models
 │   └── utils/
-│       ├── __init__.py
-│       ├── llm_client.py       # LLM API client
-│       ├── session_manager.py  # Session state management
-│       └── guvi_callback.py    # GUVI API callback
+│       ├── llm_client.py              # Multi-provider LLM client
+│       ├── session_manager.py         # In-memory session state
+│       ├── guvi_callback.py           # GUVI evaluation endpoint callback
+│       └── response_validator.py      # LLM guardrails for responses
+├── tests/
+│   ├── test_schemas.py
+│   ├── test_session_manager.py
+│   └── test_callback_payload.py
 ├── requirements.txt
 ├── .env.example
-├── .gitignore
 └── README.md
 ```
+
+## Approach
+
+**How scam detection works**: Every incoming message is analyzed by an LLM with the full conversation history. It returns a confidence score (0.0–1.0) and scam type. No hardcoded keyword lists — the LLM understands context across turns.
+
+**How personas work**: Three agents activate progressively based on confidence:
+- 0–50%: Normal User — confused and worried, asks basic questions
+- 50–85%: Skeptical User — calls out red flags, probes identity
+- 85–100%: Honeypot — active extraction mode, demands employee IDs and payment details before cooperating
+
+**How intelligence is extracted**: After each turn, an LLM scans the full conversation for bank accounts, UPI IDs, phishing links, phone numbers, emails, case IDs, policy numbers, and order numbers. Results are merged and deduplicated across turns.
+
+**How engagement is maintained**: Every persona response must include a red flag callout, an investigative question, and an elicitation attempt. This keeps the scammer engaged while maximizing Conversation Quality score.
 
 ## How It Works
 
