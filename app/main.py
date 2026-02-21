@@ -10,9 +10,10 @@ import asyncio
 import os
 import time
 
-# Limit concurrent LLM-heavy requests to prevent event loop saturation
-# and avoid health check timeouts on Render free tier
-_request_semaphore = asyncio.Semaphore(3)
+# Limit concurrent LLM-heavy requests to prevent event loop saturation.
+# GUVI sends 3 scenarios in parallel — cap at 2 so the 3rd queues safely
+# (2 x ~10s process + queue wait still under 30s timeout).
+_request_semaphore = asyncio.Semaphore(2)
 
 from app.config import settings
 from app.models.schemas import HoneypotRequest, HoneypotResponse, EngagementMetrics, Message
@@ -193,7 +194,18 @@ async def honeypot_endpoint(
         step_start = time.time()
         logger.info(f"[{session_short}] STEP 2/7: Loading session state...")
         session = session_manager.get_or_create_session(request.sessionId)
-        logger.info(f"[{session_short}] ✓ Session loaded ({time.time() - step_start:.2f}s)")
+
+        # Rebuild session from conversationHistory if session is fresh after a server restart
+        # GUVI sends full history on every turn — use it to recover lost state
+        if session.message_count == 0 and request.conversationHistory:
+            logger.warning(f"[{session_short}] Fresh session with history — rebuilding from conversationHistory (post-restart recovery)")
+            for msg in request.conversationHistory:
+                session = session_manager.update_session(
+                    session_id=request.sessionId,
+                    message=msg
+                )
+
+        logger.info(f"[{session_short}] ✓ Session loaded (msgs: {session.message_count}, {time.time() - step_start:.2f}s)")
 
         # Add incoming message to history
         session = session_manager.update_session(
