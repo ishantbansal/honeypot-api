@@ -195,8 +195,8 @@ async def honeypot_endpoint(
         logger.info(f"[{session_short}] STEP 2/7: Loading session state...")
         session = session_manager.get_or_create_session(request.sessionId)
 
-        # Rebuild session from conversationHistory if session is fresh after a server restart
-        # GUVI sends full history on every turn — use it to recover lost state
+        # Rebuild session from conversationHistory if session is fresh after a server restart.
+        # GUVI sends full history on every turn — use it to recover lost state.
         if session.message_count == 0 and request.conversationHistory:
             logger.warning(f"[{session_short}] Fresh session with history — rebuilding from conversationHistory (post-restart recovery)")
             for msg in request.conversationHistory:
@@ -204,6 +204,18 @@ async def honeypot_endpoint(
                     session_id=request.sessionId,
                     message=msg
                 )
+            # Re-extract intel from rebuilt history so accumulated state is restored
+            try:
+                recovered_intel = await intel_extractor.extract_intelligence(
+                    conversation_history=[msg.model_dump() for msg in session.conversation_history]
+                )
+                session = session_manager.update_session(
+                    session_id=request.sessionId,
+                    extracted_intel=recovered_intel
+                )
+                logger.warning(f"[{session_short}] Post-restart intel recovery complete")
+            except Exception as recovery_err:
+                logger.error(f"[{session_short}] Post-restart intel recovery failed: {recovery_err}")
 
         logger.info(f"[{session_short}] ✓ Session loaded (msgs: {session.message_count}, {time.time() - step_start:.2f}s)")
 
