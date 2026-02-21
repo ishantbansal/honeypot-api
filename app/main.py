@@ -6,8 +6,13 @@ from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import asyncio
 import os
 import time
+
+# Limit concurrent LLM-heavy requests to prevent event loop saturation
+# and avoid health check timeouts on Render free tier
+_request_semaphore = asyncio.Semaphore(3)
 
 from app.config import settings
 from app.models.schemas import HoneypotRequest, HoneypotResponse, EngagementMetrics, Message
@@ -150,6 +155,7 @@ async def honeypot_endpoint(
     Returns:
         HoneypotResponse with agent's reply
     """
+    await _request_semaphore.acquire()
     try:
         request_start = time.time()
         session_short = request.sessionId[:12]  # Short ID for logging
@@ -436,6 +442,8 @@ async def honeypot_endpoint(
             engagementDurationSeconds=0,
             agentNotes=f"Processing error - fallback response"
         )
+    finally:
+        _request_semaphore.release()
 
 
 @app.get("/api/v1/session/{session_id}")
